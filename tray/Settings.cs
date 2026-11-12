@@ -80,6 +80,7 @@ sealed partial class Settings
     public int NumpadSide { get; set; } = 1; // 1 = left, 2 = right
     public Dictionary<string, string> Paint { get; set; } = new();
     public Dictionary<string, Dictionary<string, string>> PaintPresets { get; set; } = new(); // name -> paint map
+    public string PaintColor { get; set; } = "#ff6a13"; // the colour the page paints with next
     public bool HandBackWhenSilent { get; set; } = true;
     /// <summary>Send colours through <see cref="LedCurve"/>, so the keyboard shows them as the preview does.</summary>
     public bool Gamma { get; set; } = true;
@@ -208,6 +209,9 @@ sealed partial class Settings
                 case "paint" when v.ValueKind == JsonValueKind.Object:
                     Paint = ParsePaint(v);
                     break;
+                case "paintColor" when v.ValueKind == JsonValueKind.String && HexColour().IsMatch(v.GetString()!):
+                    PaintColor = v.GetString()!.ToLowerInvariant();
+                    break;
                 case "paintPresets" when v.ValueKind == JsonValueKind.Object:
                     // Replaces all presets. Names are trimmed, 1-40 characters; at most 50 presets.
                     var presets = new Dictionary<string, Dictionary<string, string>>();
@@ -330,12 +334,12 @@ sealed partial class Settings
 
 /// <summary>
 /// Holds the current settings, hands out immutable snapshots and saves changes to
-/// %AppData%\DarkMountStudio\settings.json a moment after the last change.
+/// settings.json a moment after the last change. The app is portable: the file sits next
+/// to the exe, and nothing is kept anywhere else on the PC.
 /// </summary>
 sealed class SettingsStore : IDisposable
 {
-    public static readonly string DefaultPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DarkMountStudio", "settings.json");
+    public static readonly string DefaultPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
 
     readonly object _gate = new();
     readonly string? _path;
@@ -394,7 +398,6 @@ sealed class SettingsStore : IDisposable
             if (_path == null) return;
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
                 string tmp = _path + ".tmp";
                 File.WriteAllText(tmp, JsonSerializer.Serialize(_current, Settings.Json));
                 File.Move(tmp, _path, true);

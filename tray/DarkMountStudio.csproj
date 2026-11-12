@@ -11,7 +11,15 @@
     <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <DebugType>embedded</DebugType>
-    <Version>1.0.0</Version>
+    <!-- Releases get their version from the release workflow (.github/workflows/release.yml). -->
+    <Version>0.0.0-dev</Version>
+  </PropertyGroup>
+
+  <!-- "dotnet publish -c Release -o publish" gives one small exe that needs the .NET 8 Desktop Runtime. -->
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
 
   <!-- The settings page is embedded straight from the project folder above; rebuilding picks up changes. -->

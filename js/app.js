@@ -20,7 +20,7 @@ const hexToRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16
 const effectById = Object.fromEntries(EFFECTS.map((e) => [e.id, e]));
 
 // ------------------------------------------------------------------ settings
-// S mirrors the tray app's settings. Page-only preferences live in localStorage.
+// S mirrors the tray app's settings. The page keeps nothing itself (no localStorage, no cookies).
 
 const S = {
   enabled: true,
@@ -31,16 +31,13 @@ const S = {
   numpadSide: 1, // 1 = left of the main block, 2 = right
   paint: {},
   paintPresets: {}, // name -> saved painting
+  paintColor: '#ff6a13', // the colour to paint with next
   handBackWhenSilent: true,
   gamma: true, // the tray app corrects colours for the keyboard's LEDs, so they look like this preview
   mode: 'effect', // 'effect' = one effect on every light, 'layers' = the selected layered preset
   layerPreset: 0, // index into layerPresets
   layerPresets: [], // see layers.js
 };
-
-const PREFS = 'dark-mount-studio-prefs';
-const prefs = Object.assign({ paintColor: '#ff6a13' }, JSON.parse(localStorage.getItem(PREFS) || '{}'));
-const savePrefs = () => localStorage.setItem(PREFS, JSON.stringify(prefs));
 
 // ------------------------------------------------------------------ tray app
 
@@ -58,6 +55,7 @@ function adopt(settings) {
   if (settings.numpadSide === 1 || settings.numpadSide === 2) S.numpadSide = settings.numpadSide;
   if (settings.paint) S.paint = { ...settings.paint };
   if (settings.paintPresets) S.paintPresets = structuredClone(settings.paintPresets);
+  if (/^#[0-9a-f]{6}$/i.test(settings.paintColor)) S.paintColor = settings.paintColor;
   if (typeof settings.handBackWhenSilent === 'boolean') S.handBackWhenSilent = settings.handBackWhenSilent;
   if (typeof settings.gamma === 'boolean') S.gamma = settings.gamma;
   for (const e of EFFECTS) Object.assign(S.params[e.id], settings.params?.[e.id]);
@@ -528,14 +526,14 @@ function renderParams() {
   }
 
   if (eff.needs === 'paint') {
-    const color = el('input', { type: 'color', value: prefs.paintColor });
+    const color = el('input', { type: 'color', value: S.paintColor });
     color.addEventListener('input', () => {
-      prefs.paintColor = color.value;
-      savePrefs();
+      S.paintColor = color.value;
+      push({ paintColor: color.value });
     });
     const fill = el('button', { type: 'button', textContent: 'Fill all' });
     fill.addEventListener('click', () => {
-      for (const l of lamps) S.paint[l.id] = prefs.paintColor;
+      for (const l of lamps) S.paint[l.id] = S.paintColor;
       paintChanged();
     });
     const clear = el('button', { type: 'button', textContent: 'Clear all' });
@@ -918,7 +916,7 @@ function paintAt(ev) {
   if (!ids.length) return;
   for (const id of ids) {
     if (painting === 2) delete S.paint[id];
-    else S.paint[id] = prefs.paintColor;
+    else S.paint[id] = S.paintColor;
   }
   paintChanged();
 }

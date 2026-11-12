@@ -229,7 +229,7 @@ static class SelfTest
                     Names(liveDoc.RootElement) == "settings,status,clock" &&
                     Names(liveStatus) == "keyboard,lamps,bindings,audio,keys,driving" &&
                     liveStatus.GetProperty("keys").ValueKind == JsonValueKind.String &&
-                    Names(liveDoc.RootElement.GetProperty("settings")) == "enabled,effect,params,brightness,zones,numpadSide,paint,paintPresets,handBackWhenSilent,gamma,mode,layerPreset,layerPresets" &&
+                    Names(liveDoc.RootElement.GetProperty("settings")) == "enabled,effect,params,brightness,zones,numpadSide,paint,paintPresets,paintColor,handBackWhenSilent,gamma,mode,layerPreset,layerPresets" &&
                     !live.Body.Contains("events", StringComparison.OrdinalIgnoreCase),
                     $"status fields: {Names(liveStatus)}");
             }

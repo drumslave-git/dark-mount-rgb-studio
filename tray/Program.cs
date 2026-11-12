@@ -15,10 +15,14 @@ namespace DarkMountStudio;
 ///   DarkMountStudio.exe --dump-frame &lt;effect&gt; &lt;seconds&gt; [settings JSON] [beats]   print one rendered frame as JSON
 ///                                            (effect "layers": the layered preset selected in the settings JSON)
 ///   DarkMountStudio.exe --audio-devices       list the output devices and which one would be listened to
+///   DarkMountStudio.exe --version             print the version
 /// </summary>
 static class Program
 {
     public const string AppName = "Dark Mount Studio";
+    /// <summary>"1.2.3" in a release (the release workflow sets it from the git tag), "dev" in a local build.</summary>
+    public static readonly string AppVersion =
+        typeof(Program).Assembly.GetName().Version is { } v && (v.Major | v.Minor | v.Build) != 0 ? v.ToString(3) : "dev";
     const string MutexName = @"Local\DarkMountStudio.SingleInstance";
     const string ExitEventName = @"Local\DarkMountStudio.Exit";
 
@@ -33,6 +37,12 @@ static class Program
                 ? DumpFrame(args[at + 1], args[at + 2], args.Length > at + 3 ? args[at + 3] : null,
                     args.Length > at + 4 && int.TryParse(args[at + 4], out int beat) ? beat : 0)
                 : Usage("--dump-frame <effectId> <tSeconds> [settings JSON] [beats heard]");
+        }
+        if (args.Contains("--version"))
+        {
+            AttachConsole();
+            Console.WriteLine(AppVersion);
+            return 0;
         }
         if (args.Contains("--audio-devices"))
         {

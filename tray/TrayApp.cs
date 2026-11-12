@@ -27,6 +27,8 @@ sealed class TrayApp : ApplicationContext
         _enabled = new ToolStripMenuItem("Enabled", null, (_, _) => _store.Update(s => s.Enabled = !s.Enabled));
         _autostart = new ToolStripMenuItem("Start with Windows", null, (_, _) => Autostart.Set(!Autostart.IsEnabled()));
         var menu = new ContextMenuStrip();
+        menu.Items.Add(new ToolStripMenuItem($"{Program.AppName} {Program.AppVersion}") { Enabled = false });
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_enabled);
         menu.Items.Add(new ToolStripMenuItem("Open settings", null, (_, _) => OpenSettings()));
         menu.Items.Add(_autostart);
@@ -37,6 +39,8 @@ sealed class TrayApp : ApplicationContext
             _enabled.Checked = _store.Current.Enabled;
             _autostart.Checked = Autostart.IsEnabled();
         };
+
+        Autostart.FollowMove();
 
         _icon = new NotifyIcon { Icon = _iconOn, ContextMenuStrip = menu, Visible = true };
         _icon.DoubleClick += (_, _) => OpenSettings();
@@ -128,7 +132,10 @@ sealed class TrayApp : ApplicationContext
     }
 }
 
-/// <summary>The "Start with Windows" entry under HKCU\...\Run. Only ever written when the user ticks the menu item.</summary>
+/// <summary>
+/// The "Start with Windows" entry under HKCU\...\Run: the one thing the app keeps outside its own
+/// folder, and only once the user has ticked the menu item.
+/// </summary>
 static class Autostart
 {
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -143,7 +150,23 @@ static class Autostart
     public static void Set(bool on)
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-        if (on) key.SetValue(ValueName, $"\"{Environment.ProcessPath}\"");
+        if (on) key.SetValue(ValueName, Command);
         else key.DeleteValue(ValueName, false);
     }
+
+    /// <summary>If the entry exists but the app's folder has been moved since, points it at where the exe is now.</summary>
+    public static void FollowMove()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, true);
+            if (key?.GetValue(ValueName) is string old && old != Command) key.SetValue(ValueName, Command);
+        }
+        catch
+        {
+            // not allowed to: the entry stays as it is
+        }
+    }
+
+    static string Command => $"\"{Environment.ProcessPath}\"";
 }
