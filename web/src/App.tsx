@@ -48,7 +48,7 @@ function Controls() {
     <>
       <Toolbar />
       <ModeSwitch />
-      <div className="grid grid-cols-1 gap-6 min-[801px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="grid grid-cols-1 items-start gap-6 min-[801px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {mode === 'layers' ? (
           <>
             <LayerList />
