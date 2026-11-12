@@ -41,7 +41,9 @@ dotnet publish -c Release -o publish
 - `--selftest` drives the real keyboard for about 8 s and checks the HTTP API. It uses default
   settings in memory and does not touch `settings.json`.
 - Testing through the page changes the real `tray/publish/settings.json` (through the dev server
-  too). Note the values you change and put them back afterwards.
+  too). Note the values you change and put them back afterwards, through the page or the HTTP API.
+  Never write `settings.json` while the app runs: it keeps its settings in memory, never reads the
+  file again and saves over it, or loads the stale file on its next start.
 - There is no test suite. `dotnet build` must stay free of warnings.
 
 ## Commits and releases

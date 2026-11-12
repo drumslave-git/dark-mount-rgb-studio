@@ -8,7 +8,8 @@ namespace DarkMountStudio;
 
 /// <summary>
 /// Serves the settings page and a tiny JSON API on http://localhost:4173, loopback only.
-///   GET  /api/state   { settings, status, clock }   clock = the effects' time in seconds, for the page's preview
+///   GET  /api/state   { settings, status, clock, instance }   clock = the effects' time in seconds, for the page's
+///                     preview; instance = a new id each time the app starts, so an open page notices a restart
 ///   PUT  /api/state   any subset of the settings; answers like GET
 ///   GET  /api/levels  { levels: [32 floats], beat }   beat = number of beats heard so far
 ///   anything else     the page as Vite built it (web/): /, /index.html, /assets/*.js, /assets/*.css
@@ -20,6 +21,7 @@ sealed partial class HttpServer : IDisposable
     static readonly string[] AllowedHosts = [$"localhost:{Port}", $"127.0.0.1:{Port}"];
     static readonly string[] AllowedOrigins = [$"http://localhost:{Port}", $"http://127.0.0.1:{Port}"];
     const int MaxBodyBytes = 1 << 20;
+    static readonly string Instance = Guid.NewGuid().ToString("N");
 
     readonly SettingsStore _store;
     readonly Engine _engine;
@@ -145,7 +147,7 @@ sealed partial class HttpServer : IDisposable
     }
 
     string StateJson() =>
-        JsonSerializer.Serialize(new { settings = _store.Current, status = _engine.Status, clock = _engine.Now }, Settings.JsonCompact);
+        JsonSerializer.Serialize(new { settings = _store.Current, status = _engine.Status, clock = _engine.Now, instance = Instance }, Settings.JsonCompact);
 
     static byte[] ReadBody(HttpListenerRequest req)
     {

@@ -134,7 +134,7 @@ lights stay frozen on the last frame.
 
 | Request | Answer |
 | --- | --- |
-| `GET /api/state` | `{ settings, status, clock }` |
+| `GET /api/state` | `{ settings, status, clock, instance }` |
 | `PUT /api/state` | Takes any part of the settings object, answers like `GET` |
 | `GET /api/levels` | `{ levels: [32 numbers], beat }` |
 

@@ -9,6 +9,9 @@ import type { State, TrayStatus } from './store.ts';
 let pending: SettingsPatch | null = null;
 let pushTimer = 0;
 let pushing = false;
+// The id of the tray app whose settings the page shows. A restarted app has a new one and shows the
+// settings it saved, which the page then takes over instead of showing its own copy.
+let instance: unknown = null;
 
 // What a new status means for the state. The tray app also says which lamp is which key.
 function withStatus(status: TrayStatus | null | undefined): Partial<State> {
@@ -17,9 +20,9 @@ function withStatus(status: TrayStatus | null | undefined): Partial<State> {
   return { status: status ?? null, ...(changed ? { bindings: fromTray } : null) };
 }
 
-// Asks the tray app for its state. The settings are only taken over when `adoptSettings` is set
-// (on opening the page): after that the page is where they are changed.
-export async function pull(adoptSettings: boolean) {
+// Asks the tray app for its state. The settings are taken over the first time a tray app answers
+// (on opening the page, or after it restarted): after that the page is where they are changed.
+async function pull() {
   try {
     const asked = performance.now();
     const r = await fetch('/api/state', { cache: 'no-store' });
@@ -29,7 +32,10 @@ export async function pull(adoptSettings: boolean) {
     syncClock(j.clock, asked, answered);
     const patch: Partial<State> = { reachable: true, ...withStatus(j.status) };
     const settings = getState().settings;
-    if (adoptSettings) {
+    if (j.instance !== instance) {
+      instance = j.instance;
+      pending = null; // changes meant for an app that has stopped
+      patch.selectedLayer = 0;
       patch.settings = adopt(settings, j.settings);
     } else if (!pending && !pushing && typeof j.settings?.enabled === 'boolean' && j.settings.enabled !== settings.enabled) {
       patch.settings = { ...settings, enabled: j.settings.enabled }; // toggled from the tray icon's menu
@@ -80,11 +86,11 @@ async function flush() {
 }
 
 /** Asks again in a moment: sound capture and key watching start on demand. */
-export const refreshStatusSoon = () => void setTimeout(() => pull(false), 900);
+export const refreshStatusSoon = () => void setTimeout(() => pull(), 900);
 
 /** Reads the settings once, then keeps an eye on the tray app's status. */
 export async function connect() {
-  await pull(true);
+  await pull();
   setState({ loaded: true });
-  setInterval(() => pull(false), 3000);
+  setInterval(() => pull(), 3000);
 }
