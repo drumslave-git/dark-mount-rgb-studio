@@ -24,6 +24,30 @@ This is an unofficial hobby project. It is not affiliated with or endorsed by be
 - Hands the lights back to the keyboard's own effect when it is switched off, exits, or (for audio
   effects) when nothing is playing.
 
+## A few of the effects
+
+<table>
+<tr>
+<td><img src="docs/effects/wave.gif" alt="Wave effect" width="100%"><br><b>Wave</b> · Motion</td>
+<td><img src="docs/effects/plasma.gif" alt="Plasma effect" width="100%"><br><b>Plasma</b> · Motion</td>
+</tr>
+<tr>
+<td><img src="docs/effects/aurora.gif" alt="Aurora effect" width="100%"><br><b>Aurora</b> · Nature</td>
+<td><img src="docs/effects/fire.gif" alt="Fire effect" width="100%"><br><b>Fire</b> · Nature</td>
+</tr>
+<tr>
+<td><img src="docs/effects/audio.gif" alt="Audio spectrum effect" width="100%"><br><b>Audio spectrum</b> · Audio</td>
+<td><img src="docs/effects/audiobloom.gif" alt="Audio bloom effect" width="100%"><br><b>Audio bloom</b> · Audio</td>
+</tr>
+<tr>
+<td><img src="docs/effects/keyripple.gif" alt="Key ripple effect" width="100%"><br><b>Key ripple</b> · Typing</td>
+<td><img src="docs/effects/keysplash.gif" alt="Key splash effect" width="100%"><br><b>Key splash</b> · Typing</td>
+</tr>
+</table>
+
+These are drawn by the settings page's own preview code (`npm run gifs` in `web/`). The audio effects
+are playing a made-up song and the typing effects watch made-up typing.
+
 ## Requirements
 
 - Windows (tested on Windows 11)
@@ -104,6 +128,7 @@ and writes `tray/publish/DarkMountStudio.exe`.
 | `web/src/lib/layers.ts` | Layered presets |
 | `web/src/lib/geometry.ts`, `web/src/lib/layout.ts`, `web/src/lib/board.ts` | Where each light sits and the keyboard's lamp table |
 | `web/scripts/frame.ts` | Prints one frame of the preview, for comparing with `--dump-frame` |
+| `web/scripts/gifs.ts`, `docs/effects/` | Renders effects as looping GIFs, and the ones shown in this README |
 | `tray/Program.cs` | Entry point and command line |
 | `tray/Engine.cs` | The loop that renders and sends frames |
 | `tray/Effects.cs`, `tray/EffectsMore.cs`, `tray/Palette.cs`, `tray/Renderer.cs` | C# port of the effects and layers |
@@ -159,6 +184,14 @@ one frame from each. They take the same arguments and must print the same bytes:
 cd web
 npm run --silent frame -- wave 1
 ../tray/publish/DarkMountStudio.exe --dump-frame wave 1
+```
+
+To redraw the GIFs at the top of this page, name the effects (optionally with a length in
+seconds, `aurora:6`):
+
+```bash
+cd web
+npm run gifs -- ../docs/effects wave plasma aurora fire audio audiobloom keyripple keysplash
 ```
 
 ### Releases

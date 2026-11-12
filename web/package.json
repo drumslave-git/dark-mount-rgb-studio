@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc",
-    "frame": "node scripts/frame.ts"
+    "frame": "node scripts/frame.ts",
+    "gifs": "node scripts/gifs.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
