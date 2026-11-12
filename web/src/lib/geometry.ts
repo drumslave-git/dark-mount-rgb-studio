@@ -8,8 +8,10 @@
 // Measured from a photo of the board: 0 is the left edge of Esc / the centre line of the F row.
 const ROWS = [0, 1.2, 2.2, 3.2, 4.2, 5.2]; // F row, numbers, QWERTY, ASDF, ZXCV, bottom
 
-const KEYS = {};
-const row = (y, first, xs) => xs.forEach((x, i) => (KEYS[first + i] = [x, y]));
+type Point = [x: number, y: number];
+
+const KEYS: Record<number, Point> = {};
+const row = (y: number, first: number, xs: number[]) => xs.forEach((x, i) => (KEYS[first + i] = [x, y]));
 
 // Main block. Binding numbers are the keyboard's own key ids.
 row(ROWS[1], 1, [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 14]); // ` 1..0 - = Bksp
@@ -38,7 +40,7 @@ KEYS[68] = [17.75, ROWS[2]]; // PgDn
 KEYS[69] = [17.75, ROWS[5]]; // Right
 
 // Numpad module, in its own coordinates (ids run down each column).
-const PAD = {
+const PAD: Record<number, Point> = {
   70: [0.5, ROWS[1]], 71: [0.5, ROWS[2]], 72: [0.5, ROWS[3]], 73: [0.5, ROWS[4]], // NumLk 7 4 1
   74: [1.5, ROWS[1]], 75: [1.5, ROWS[2]], 76: [1.5, ROWS[3]], 77: [1.5, ROWS[4]], 78: [1, ROWS[5]], // / 8 5 2 0
   79: [2.5, ROWS[1]], 80: [2.5, ROWS[2]], 81: [2.5, ROWS[3]], 82: [2.5, ROWS[4]], 83: [2.5, ROWS[5]], // * 9 6 3 .
@@ -48,17 +50,31 @@ const PAD = {
 // Edge light bars follow the outline of each case. The top bezel is tall (logo strip on
 // the main block, the eight display keys on the numpad module).
 const TOP = -1.96, BOTTOM = 5.88;
-const MAIN = { x0: -0.34, x1: 18.58, across: 23, first: 106 };
-const PADBOX = { x0: -0.38, x1: 4.4, across: 7, first: 170 };
+const MAIN: Case = { x0: -0.34, x1: 18.58, across: 23, first: 106 };
+const PADBOX: Case = { x0: -0.38, x1: 4.4, across: 7, first: 170 };
 const SIDE = 9;
+
+interface Case {
+  x0: number;
+  x1: number;
+  across: number; // lights along the top (and the bottom)
+  first: number; // binding of the first light
+}
+
+export interface LampPosition {
+  x: number;
+  y: number;
+  zone: 'keys' | 'numpad' | 'bars';
+  bar: boolean;
+}
 const GAP = 0.1; // the numpad module sits flush against the main block
 
 // Edge LEDs are numbered clockwise: top (left to right), right side (down),
 // bottom (right to left), left side (up).
-function perimeter(box, index) {
+function perimeter(box: Case, index: number): Point | null {
   const { x0, x1, across } = box;
-  const sideY = (k) => TOP + ((k + 1) / (SIDE + 1)) * (BOTTOM - TOP);
-  const topX = (k) => x0 + (k / (across - 1)) * (x1 - x0);
+  const sideY = (k: number) => TOP + ((k + 1) / (SIDE + 1)) * (BOTTOM - TOP);
+  const topX = (k: number) => x0 + (k / (across - 1)) * (x1 - x0);
   if (index < across) return [topX(index), TOP];
   index -= across;
   if (index < SIDE) return [x1, sideY(index)];
@@ -71,18 +87,18 @@ function perimeter(box, index) {
 
 // Returns { x, y, zone, bar } for a lamp binding, or null when the binding is unknown.
 // padSide: 1 = numpad attached on the left, 2 = on the right.
-export function lampPosition(binding, padSide) {
+export function lampPosition(binding: number, padSide: number): LampPosition | null {
   const padShift = padSide === 2 ? MAIN.x1 + GAP - PADBOX.x0 : MAIN.x0 - GAP - PADBOX.x1;
   if (KEYS[binding]) return { x: KEYS[binding][0], y: KEYS[binding][1], zone: 'keys', bar: false };
   if (PAD[binding]) return { x: PAD[binding][0] + padShift, y: PAD[binding][1], zone: 'numpad', bar: false };
   const perMain = 2 * (MAIN.across + SIDE);
   if (binding >= MAIN.first && binding < MAIN.first + perMain) {
-    const [x, y] = perimeter(MAIN, binding - MAIN.first);
+    const [x, y] = perimeter(MAIN, binding - MAIN.first)!;
     return { x, y, zone: 'bars', bar: true };
   }
   const perPad = 2 * (PADBOX.across + SIDE);
   if (binding >= PADBOX.first && binding < PADBOX.first + perPad) {
-    const [x, y] = perimeter(PADBOX, binding - PADBOX.first);
+    const [x, y] = perimeter(PADBOX, binding - PADBOX.first)!;
     return { x: x + padShift, y, zone: 'numpad', bar: true };
   }
   return null;
@@ -90,7 +106,7 @@ export function lampPosition(binding, padSide) {
 
 // Browser key codes (KeyboardEvent.code) to the keyboard's key ids, for trying the
 // key-reactive effects in the preview.
-const CODES = {
+const CODES: Record<string, number> = {
   Backquote: 1, Minus: 12, Equal: 13, Backspace: 14, Tab: 15, BracketLeft: 26, BracketRight: 27, Backslash: 28,
   CapsLock: 29, Semicolon: 39, Quote: 40, Enter: 41, ShiftLeft: 42, Comma: 50, Period: 51, Slash: 52, ShiftRight: 53,
   ControlLeft: 54, AltLeft: 56, Space: 57, AltRight: 58, ControlRight: 59,
@@ -105,10 +121,10 @@ const CODES = {
 'ZXCVBNM'.split('').forEach((c, i) => (CODES[`Key${c}`] = 43 + i));
 for (let f = 1; f <= 12; f++) CODES[`F${f}`] = 87 + f;
 
-export const keyIdForCode = (code) => CODES[code] ?? null;
+export const keyIdForCode = (code: string): number | null => CODES[code] ?? null;
 
 // Keycap sizes in key units for the keys that are not 1 x 1.
-const SIZES = {
+const SIZES: Record<number, [w: number, h: number]> = {
   14: [2, 1], // Backspace
   15: [1.5, 1], 28: [1.5, 1], // Tab, backslash
   29: [1.75, 1], 41: [2.25, 1], // Caps, Enter
@@ -119,7 +135,7 @@ const SIZES = {
 };
 
 // Width and height of the keycap a lamp sits under (edge LEDs have no keycap).
-export function keySize(binding) {
+export function keySize(binding: number): [w: number, h: number] {
   return SIZES[binding] ?? [1, 1];
 }
 
@@ -127,7 +143,13 @@ export function keySize(binding) {
 export const ISO_KEY = 105;
 
 // Outlines of the two cases and the eight display keys (which have no lights), for drawing.
-export function chassis(padSide) {
+export interface Chassis {
+  main: { x0: number; y0: number; x1: number; y1: number };
+  pad: { x0: number; y0: number; x1: number; y1: number };
+  displayKeys: { x: number; y: number; size: number }[];
+}
+
+export function chassis(padSide: number): Chassis {
   const padShift = padSide === 2 ? MAIN.x1 + GAP - PADBOX.x0 : MAIN.x0 - GAP - PADBOX.x1;
   const displayKeys = [];
   for (const y of [-1.08, -0.04]) {
@@ -142,7 +164,7 @@ export function chassis(padSide) {
 
 // Rough placement for a lamp whose binding is not in the tables above: the position the
 // keyboard reported, scaled onto the main block.
-export function fallbackPosition(xUm, yUm) {
+export function fallbackPosition(xUm: number, yUm: number): LampPosition {
   return {
     x: MAIN.x0 + ((xUm - 100000) / 333790) * (MAIN.x1 - MAIN.x0),
     y: TOP + (yUm / 140000) * (BOTTOM - TOP),

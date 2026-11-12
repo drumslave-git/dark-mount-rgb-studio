@@ -23,7 +23,7 @@ readonly record struct Ripple(double X, double Y, double T0, double C);
 /// (below 0 while still held), both in seconds on the same clock as Frame.T, N = running count of presses.</summary>
 readonly record struct KeyEvent(int I, double T, double R, int N);
 
-/// <summary>Everything an effect needs to draw one frame (the `ctx` of js/effects.js).</summary>
+/// <summary>Everything an effect needs to draw one frame (the `ctx` of web/src/lib/effects.ts).</summary>
 sealed class Frame
 {
     public double T, Dt;                                        // seconds
@@ -48,7 +48,7 @@ sealed record EffectDef(string Id, string[] Params, EffectParams Defaults, Needs
 }
 
 /// <summary>
-/// Lighting effects: a C# port of js/effects.js, which draws the preview in the settings page.
+/// Lighting effects: a C# port of web/src/lib/effects.ts, which draws the preview in the settings page.
 /// Same ids, parameters, defaults and maths - keep the two in step when changing an effect.
 /// This file holds the shared helpers, the table of all effects and the first batch of
 /// effects; EffectsMore.cs holds the rest.
@@ -159,14 +159,14 @@ static partial class Effects
     static readonly string[] AuroraPalette = ["#000814", "#00c853", "#00e5ff", "#7c4dff"];
     static readonly string[] Candy = ["#ff4fa3", "#ffd166", "#06d6a0", "#4cc9f0"];
 
-    /// <summary>Allowed range of each numeric parameter (PARAMS in js/effects.js).</summary>
+    /// <summary>Allowed range of each numeric parameter (PARAMS in web/src/lib/effects.ts).</summary>
     public static readonly IReadOnlyDictionary<string, (double Min, double Max)> ParamRanges = new Dictionary<string, (double, double)>
     {
         ["speed"] = (0, 3), ["scale"] = (0.2, 4), ["angle"] = (0, 360), ["density"] = (0.05, 1),
         ["width"] = (0.05, 1), ["arms"] = (1, 6), ["gain"] = (0.3, 4), ["fade"] = (0.1, 5),
     };
 
-    // Same order as EFFECTS in js/effects.js.
+    // Same order as EFFECTS in web/src/lib/effects.ts.
     public static readonly EffectDef[] All =
     [
         new("wave", ["speed", "scale", "angle"], new() { Speed = 0.8, Scale = 1, Angle = 0, Palette = Rainbow }, Needs.Nothing, Wave),

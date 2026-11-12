@@ -20,3 +20,7 @@ Desktop.ini
 .claude/settings.local.json
 .claude/worktrees/
 .codegraph/
+
+# The settings page's dependencies and its build output (embedded in the exe)
+web/node_modules/
+web/dist/

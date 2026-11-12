@@ -12,9 +12,7 @@ on:
     branches: [main]
     paths:
       - 'tray/**'
-      - 'js/**'
-      - 'index.html'
-      - 'styles.css'
+      - 'web/**'
   workflow_dispatch:
     inputs:
       bump:
@@ -61,6 +59,14 @@ jobs:
         if: steps.version.outputs.skip != 'true'
         with:
           dotnet-version: 8.0.x
+
+      # The settings page (web/) is built with Vite as part of "dotnet publish".
+      - uses: actions/setup-node@v6
+        if: steps.version.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Build
         if: steps.version.outputs.skip != 'true'

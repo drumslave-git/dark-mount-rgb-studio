@@ -5,7 +5,7 @@ readonly record struct LampPos(double X, double Y, bool Bar, bool Numpad);
 
 /// <summary>
 /// Physical positions of the Dark Mount's lights, looked up from each lamp's "binding" number.
-/// A straight port of js/geometry.js (the positions the keyboard reports itself are inaccurate).
+/// A straight port of web/src/lib/geometry.ts (the positions the keyboard reports itself are inaccurate).
 /// </summary>
 static class Geometry
 {

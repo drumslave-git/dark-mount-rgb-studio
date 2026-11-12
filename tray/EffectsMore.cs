@@ -1,6 +1,6 @@
 namespace DarkMountStudio;
 
-// The second batch of effects from js/effects.js (static, motion, nature, pulse, more audio
+// The second batch of effects from web/src/lib/effects.ts (static, motion, nature, pulse, more audio
 // and more key-reactive ones) with the helpers they share. Like the JS they use no rounding
 // other than floor and no random numbers, so both sides produce the same bytes.
 static partial class Effects

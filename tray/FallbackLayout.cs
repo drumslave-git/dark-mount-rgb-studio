@@ -1,7 +1,7 @@
 namespace DarkMountStudio;
 
 /// <summary>
-/// Lamp table read from a Dark Mount with the numpad attached (copied from js/layout.js):
+/// Lamp table read from a Dark Mount with the numpad attached (copied from web/src/lib/layout.ts):
 /// reported x and y in micrometres plus the binding, indexed by lamp id.
 /// Only used when the table cannot be read from the keyboard itself.
 /// </summary>

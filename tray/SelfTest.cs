@@ -318,17 +318,15 @@ static class SelfTest
 
             var index = Send(HttpMethod.Get, "/");
             Check("GET /", index.Code == HttpStatusCode.OK && index.Type == "text/html" && index.Cache == "no-store", $"{index.Body.Length} chars, {index.Type}");
-            var css = Send(HttpMethod.Get, "/styles.css");
-            Check("GET /styles.css", css.Code == HttpStatusCode.OK && css.Type == "text/css", $"{css.Body.Length} chars, {css.Type}");
-            foreach (string name in new[] { "app.js", "effects.js", "geometry.js", "layers.js", "layout.js" })
-            {
-                var js = Send(HttpMethod.Get, "/js/" + name);
-                Check($"GET /js/{name}", js.Code == HttpStatusCode.OK && js.Type == "text/javascript", $"{js.Body.Length} chars, {js.Type}");
-            }
+            Check("the page names its script and its styles", index.Body.Contains("/assets/app.js") && index.Body.Contains("/assets/app.css"));
+            var css = Send(HttpMethod.Get, "/assets/app.css");
+            Check("GET /assets/app.css", css.Code == HttpStatusCode.OK && css.Type == "text/css", $"{css.Body.Length} chars, {css.Type}");
+            var js = Send(HttpMethod.Get, "/assets/app.js");
+            Check("GET /assets/app.js", js.Code == HttpStatusCode.OK && js.Type == "text/javascript", $"{js.Body.Length} chars, {js.Type}");
             Check("paths outside the site are not served",
-                Send(HttpMethod.Get, "/js/..%2fProgram.cs").Code == HttpStatusCode.NotFound &&
+                Send(HttpMethod.Get, "/assets/..%2fProgram.cs").Code == HttpStatusCode.NotFound &&
                 Send(HttpMethod.Get, "/server.js").Code == HttpStatusCode.NotFound &&
-                Send(HttpMethod.Get, "/js/%2e%2e/%2e%2e/tray/Program.cs").Code == HttpStatusCode.NotFound);
+                Send(HttpMethod.Get, "/assets/%2e%2e/%2e%2e/tray/Program.cs").Code == HttpStatusCode.NotFound);
         }
         catch (Exception e)
         {

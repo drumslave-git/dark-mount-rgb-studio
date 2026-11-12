@@ -137,7 +137,7 @@ static class Program
     }
 
     /// <summary>
-    /// Prints one frame as a JSON array of RGB bytes per lamp id, for comparing with js/effects.js:
+    /// Prints one frame as a JSON array of RGB bytes per lamp id, for comparing with web/src/lib/effects.ts ("npm run frame" in web/ prints the same from it):
     /// stored lamp table, numpad on the left, default parameters, brightness 100, all zones on,
     /// levels[b] = clamp(0.3 + 0.5 sin b), `beat` beats heard (fourth argument, 0 if left out), paint = { 5: #ff0000 }, fresh scratch state, dt = 1/30,
     /// key presses = lamp 60 pressed at T-1.2 and released at T-1.0, lamp 95 held since T-0.4,

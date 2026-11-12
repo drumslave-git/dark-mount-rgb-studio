@@ -1,7 +1,7 @@
 namespace DarkMountStudio;
 
 /// <summary>
-/// An effect's palette: a list of [r, g, b] colours (the `pal` of js/effects.js). With the
+/// An effect's palette: a list of [r, g, b] colours (the `pal` of web/src/lib/effects.ts). With the
 /// effect's "Random colours" option on it also carries a seed. Every lookup then gives a random
 /// bright colour instead: colour number k (any whole number - they never repeat) gets its own
 /// hue, and keeps the brightness of the palette colour it stands in for, so a palette's dark
@@ -27,7 +27,7 @@ sealed class Palette
         _beatStep = BeatStep(colours.Length);
     }
 
-    /// <summary>How far one beat moves a palette of n colours on (beatStep in js/effects.js, explained there).</summary>
+    /// <summary>How far one beat moves a palette of n colours on (beatStep in web/src/lib/effects.ts, explained there).</summary>
     static int BeatStep(int n)
     {
         for (int step = n; ; step++)
@@ -40,7 +40,7 @@ sealed class Palette
 
     /// <summary>
     /// With random colours: gives the palette a fresh set of colours for beat number `beat`
-    /// (newColoursOnBeat in js/effects.js). The audio effects call it on every frame.
+    /// (newColoursOnBeat in web/src/lib/effects.ts). The audio effects call it on every frame.
     /// </summary>
     public void NewColoursOnBeat(int beat)
     {

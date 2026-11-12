@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* The page's colours and type sizes, as Tailwind utilities: bg-panel, text-muted, text-hint ... */
+@theme {
+  --color-bg: #121315;
+  --color-stage: #0b0c0d; /* behind the keyboard picture */
+  --color-panel: #1a1c1f;
+  --color-panel-2: #22252a; /* buttons and boxes on a panel */
+  --color-line: #2e3238;
+  --color-line-hover: #4a5058;
+  --color-ink: #e8e9eb;
+  --color-muted: #9aa0a8;
+  --color-accent: #ff6a13;
+  --color-chosen: #2a1c12; /* background of the item that is selected */
+  --color-ok: #8fd694;
+  --color-danger: #ffb4a8;
+
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Sizes only, so the line height stays the page's. */
+  --text-small: 12px;
+  --text-hint: 13px;
+  --text-title: 18px;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font: 14px/1.45 var(--font-sans);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Native controls, in the accent colour and with the room browsers give them by default. */
+  input[type="range"] {
+    accent-color: var(--color-accent);
+    margin: 2px;
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--color-accent);
+    width: 16px;
+    height: 16px;
+    margin: 3px 3px 3px 4px;
+  }
+}

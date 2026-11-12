@@ -2,8 +2,8 @@
 //
 // frame(ctx) receives:
 //   t, dt   seconds
-//   lamps   [{ id, u, v, cx, cy, zone, rnd }]  u/v in 0..1, cx/cy centred with equal scale (cy spans about -0.5..0.5)
-//           In a layered preset (layers.js) an effect only gets its layer's lights, measured over that layer.
+//   lamps   [{ id, u, v, cx, cy, rnd, ... }]  u/v in 0..1, cx/cy centred with equal scale (cy spans about -0.5..0.5)
+//           In a layered preset (layers.ts) an effect only gets its layer's lights, measured over that layer.
 //   out     Uint8ClampedArray(lamps.length * 3)
 //   p       the effect's parameters
 //   pal     palette as [[r,g,b], ...]
@@ -13,24 +13,105 @@
 // The tray app (tray/) runs a C# port of this file to drive the keyboard; this copy draws
 // the preview. Keep the two in step when changing an effect.
 
-const TAU = Math.PI * 2;
-const frac = (x) => x - Math.floor(x);
-const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+/** A colour as [r, g, b], each 0..255. */
+export type Colour = ArrayLike<number>;
+/** Anything colours are written into: a frame (3 values per lamp) or a single colour. */
+export type Buffer = Uint8ClampedArray | Float64Array | number[];
 
-function hash3(x, y, z) {
+/** See "palettes" below. */
+export interface Palette extends Array<number[]> {
+  seed?: number;
+  offset?: number;
+  beatStep?: number;
+}
+
+/** A light as an effect sees it. */
+export interface Lamp {
+  id: number;
+  binding: number; // the keyboard's own id of the key or edge LED
+  u: number;
+  v: number;
+  cx: number;
+  cy: number;
+  rnd: number;
+  bar: boolean; // an edge light
+  pad: boolean; // on the numpad module
+  bv?: number; // inside a layer: the board's v
+}
+
+export interface KeyEvent {
+  i: number;
+  t: number;
+  r: number;
+  n: number;
+}
+
+export interface Io {
+  levels: ArrayLike<number> | null;
+  beat: number;
+  paint: Record<string, Colour | undefined>; // lamp id -> colour
+  keys?: { events: KeyEvent[] };
+}
+
+export type ParamKey = 'speed' | 'scale' | 'angle' | 'density' | 'width' | 'arms' | 'gain' | 'fade';
+
+/** An effect's parameters as its frame() reads them; it only has the ones it lists. */
+export type Params = Record<ParamKey, number> & { palette: string[]; random: boolean };
+/** Parameters as they are stored: just the ones the effect has. */
+export type StoredParams = Partial<Params>;
+
+/** What effects keep between frames. */
+export interface Scratch {
+  smooth?: Float32Array;
+  acc?: Float64Array;
+  heat?: Float64Array;
+  mul?: Float64Array;
+  cols?: { y: number; sp: number }[];
+  rip?: { x: number; y: number; t0: number; c: number }[];
+}
+
+export interface FrameContext {
+  t: number;
+  dt: number;
+  lamps: Lamp[];
+  out: Uint8ClampedArray;
+  p: Params;
+  pal: Palette;
+  st: Scratch;
+  io: Io;
+}
+
+export type Need = 'audio' | 'keys' | 'paint';
+
+export interface Effect {
+  id: string;
+  name: string;
+  desc: string;
+  needs?: Need; // a live input the effect uses
+  params: ParamKey[];
+  defaults: StoredParams;
+  noPalette?: boolean;
+  frame(ctx: FrameContext): void;
+}
+
+const TAU = Math.PI * 2;
+const frac = (x: number) => x - Math.floor(x);
+const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+function hash3(x: number, y: number, z: number) {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-function noise3(x, y, z) {
+function noise3(x: number, y: number, z: number) {
   const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
   let xf = x - xi, yf = y - yi, zf = z - zi;
   xf = xf * xf * (3 - 2 * xf);
   yf = yf * yf * (3 - 2 * yf);
   zf = zf * zf * (3 - 2 * zf);
-  const lerp = (a, b, f) => a + (b - a) * f;
-  const plane = (zz) =>
+  const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
+  const plane = (zz: number) =>
     lerp(
       lerp(hash3(xi, yi, zz), hash3(xi + 1, yi, zz), xf),
       lerp(hash3(xi, yi + 1, zz), hash3(xi + 1, yi + 1, zz), xf),
@@ -39,7 +120,7 @@ function noise3(x, y, z) {
   return lerp(plane(zi), plane(zi + 1), zf);
 }
 
-function put(out, i, c, b = 1) {
+function put(out: Buffer, i: number, c: Colour, b = 1) {
   out[i * 3] = c[0] * b;
   out[i * 3 + 1] = c[1] * b;
   out[i * 3 + 2] = c[2] * b;
@@ -56,15 +137,15 @@ function put(out, i, c, b = 1) {
 // the audio effects use it to get a fresh set of random colours on every beat.
 
 const RA = new Float64Array(3), RB = new Float64Array(3);
-const wrap = (k, n) => ((k % n) + n) % n;
+const wrap = (k: number, n: number) => ((k % n) + n) % n;
 const GOLDEN = 0.61803398875;
 
-function randomStop(pal, k, into) {
+function randomStop<T extends Buffer>(pal: Palette, k: number, into: T): T {
   const base = pal[wrap(k, pal.length)];
   const v = Math.max(base[0], base[1], base[2]);
   k += pal.offset || 0;
   // Golden-ratio steps keep neighbouring colours well apart; the hash adds a little jitter.
-  const h = frac(k * GOLDEN + hash3(pal.seed, 0, 977) + (hash3(k, pal.seed, 978) - 0.5) * 0.12) * 6;
+  const h = frac(k * GOLDEN + hash3(pal.seed!, 0, 977) + (hash3(k, pal.seed!, 978) - 0.5) * 0.12) * 6;
   const s = Math.floor(h), f = h - s, up = v * f, down = v * (1 - f);
   into[0] = s === 0 || s === 5 ? v : s === 1 ? down : s === 4 ? up : 0;
   into[1] = s === 1 || s === 2 ? v : s === 0 ? up : s === 3 ? down : 0;
@@ -73,19 +154,19 @@ function randomStop(pal, k, into) {
 }
 
 // Colour number k of the palette; k may be any whole number.
-function pick(pal, k) {
+function pick(pal: Palette, k: number): Colour {
   return pal.seed === undefined ? pal[wrap(k, pal.length)] : randomStop(pal, k, [0, 0, 0]);
 }
 
 // A palette colour chosen by r in 0..1.
-function pickR(pal, r) {
+function pickR(pal: Palette, r: number): Colour {
   const n = pal.length, j = Math.floor(r * n) % n;
   return pal.seed === undefined ? pal[j] : randomStop(pal, j + Math.floor(r * 4096) * n, [0, 0, 0]);
 }
 
 // Part of a palette (colours from..to-1), keeping its random setting.
-function subPalette(pal, from, to) {
-  const part = pal.slice(from, to);
+function subPalette(pal: Palette, from: number, to: number) {
+  const part: Palette = pal.slice(from, to);
   part.seed = pal.seed;
   return part;
 }
@@ -93,9 +174,9 @@ function subPalette(pal, from, to) {
 // Palette lookup that wraps around (last colour blends back into the first). With random
 // colours it does not wrap, unless `period` says after how many colours it must repeat
 // (needed where the lookup goes once around a circle).
-function palCyc(pal, t, out, i, b = 1, period = 0) {
+function palCyc(pal: Palette, t: number, out: Buffer, i: number, b = 1, period = 0) {
   const n = pal.length;
-  let a, c, f;
+  let a: Colour, c: Colour, f: number;
   if (pal.seed === undefined) {
     const x = frac(t) * n;
     const k = Math.floor(x) % n;
@@ -114,7 +195,7 @@ function palCyc(pal, t, out, i, b = 1, period = 0) {
 }
 
 // Palette lookup from first colour (t = 0) to last colour (t = 1).
-function palLin(pal, t, out, i, b = 1) {
+function palLin(pal: Palette, t: number, out: Buffer, i: number, b = 1) {
   const n = pal.length, random = pal.seed !== undefined;
   if (n === 1) return put(out, i, random ? randomStop(pal, 0, RA) : pal[0], b);
   const x = clamp01(t) * (n - 1);
@@ -130,7 +211,7 @@ function palLin(pal, t, out, i, b = 1) {
 // the next beat), and by a step whose hue turn is at least a quarter of the colour wheel from
 // one beat to the next and still clearly different two, three and four beats later - so the
 // colours never look like a slightly different shade or swing between two sets.
-function beatStep(n) {
+function beatStep(n: number) {
   for (let step = n; ; step++) {
     let ok = true;
     // The turn after m beats must stay this close to half the wheel (0.5 = anywhere).
@@ -140,7 +221,7 @@ function beatStep(n) {
 }
 
 // With random colours: gives the palette a fresh set of colours for beat number `beat`.
-function newColoursOnBeat(pal, beat) {
+function newColoursOnBeat(pal: Palette, beat: number) {
   if (pal.seed === undefined) return;
   pal.beatStep ??= beatStep(pal.length);
   pal.offset = beat * pal.beatStep;
@@ -149,7 +230,7 @@ function newColoursOnBeat(pal, beat) {
 // Audio bands with fast attack and slow decay. io.levels holds 32 values in 0..1
 // (bass first); the result lives in the effect's scratch object. io.beat counts the beats
 // heard so far: with random colours, `pal` gets new ones on every beat.
-function smoothLevels(io, st, gain, pal) {
+function smoothLevels(io: Io, st: Scratch, gain: number, pal: Palette) {
   newColoursOnBeat(pal, io.beat || 0);
   if (!st.smooth || st.smooth.length !== 32) st.smooth = new Float32Array(32);
   const lv = io.levels;
@@ -164,11 +245,11 @@ function smoothLevels(io, st, gain, pal) {
 //   { i, t, r, n }   i = index of the pressed key's lamp, t = time of the press and
 //                    r = time of the release (below 0 while still held), both in seconds on
 //                    the same clock as ctx.t, n = running count of presses.
-const keyEvents = (io) => io.keys?.events ?? [];
+const keyEvents = (io: Io) => io.keys?.events ?? [];
 
 // Sums light in floating point and writes it to `out` once, so overlapping presses add up
 // the same way whatever order they are drawn in.
-function accumulator(st, out) {
+function accumulator(st: Scratch, out: Uint8ClampedArray) {
   if (!st.acc || st.acc.length !== out.length) st.acc = new Float64Array(out.length);
   st.acc.fill(0);
   return st.acc;
@@ -177,27 +258,27 @@ function accumulator(st, out) {
 // ---- small helpers shared by the effects below
 // (No Math.round or Math.random here: the tray app's C# port must give the same numbers.)
 
-const rand = (a, b, c) => hash3(Math.floor(a), Math.floor(b), Math.floor(c)); // repeatable 0..1 from three whole numbers
-const tri = (x) => {
+const rand = (a: number, b: number, c: number) => hash3(Math.floor(a), Math.floor(b), Math.floor(c)); // repeatable 0..1 from three whole numbers
+const tri = (x: number) => {
   const f = frac(x) * 2;
   return f < 1 ? f : 2 - f; // 0 -> 1 -> 0
 };
-const gauss = (x) => Math.exp(-x * x);
+const gauss = (x: number) => Math.exp(-x * x);
 const TMP = new Float64Array(3);
 
-function mix(out, i, a, c, f, b = 1) {
+function mix(out: Buffer, i: number, a: Colour, c: Colour, f: number, b = 1) {
   out[i * 3] = (a[0] + (c[0] - a[0]) * f) * b;
   out[i * 3 + 1] = (a[1] + (c[1] - a[1]) * f) * b;
   out[i * 3 + 2] = (a[2] + (c[2] - a[2]) * f) * b;
 }
 
-function add(acc, i, c, b) {
+function add(acc: Float64Array, i: number, c: Colour, b: number) {
   acc[i * 3] += c[0] * b;
   acc[i * 3 + 1] += c[1] * b;
   acc[i * 3 + 2] += c[2] * b;
 }
 
-const avg = (levels, from, to) => {
+const avg = (levels: ArrayLike<number>, from: number, to: number) => {
   let s = 0;
   for (let b = from; b < to; b++) s += levels[b];
   return s / (to - from);
@@ -206,13 +287,13 @@ const avg = (levels, from, to) => {
 // Key row of a light, 0 (F row) to 5 (space bar row). The board's v runs over the case height,
 // 7.84 key units, with the F row 1.96 units below the top edge. (Inside a layer, l.v is measured
 // over the layer's own lights and l.bv is the board's.)
-const rowOf = (l) => {
+const rowOf = (l: Lamp) => {
   const y = (l.bv ?? l.v) * 7.84 - 1.96;
   return y < 0.6 ? 0 : Math.min(5, Math.max(1, 1 + Math.floor(y - 0.7)));
 };
 
 // Largest projection of any light onto a direction, for effects that span the whole board.
-function spanAlong(lamps, dx, dy) {
+function spanAlong(lamps: Lamp[], dx: number, dy: number) {
   let span = 1e-6;
   for (let i = 0; i < lamps.length; i++) span = Math.max(span, Math.abs(lamps[i].cx * dx + lamps[i].cy * dy));
   return span;
@@ -220,7 +301,7 @@ function spanAlong(lamps, dx, dy) {
 
 const WASD_KEYS = [17, 30, 31, 32, 62, 65, 66, 69]; // key ids of W A S D and the four arrows
 
-export const PALETTES = {
+export const PALETTES: Record<string, string[]> = {
   Rainbow: ['#ff0000', '#ffd000', '#00ff40', '#00e5ff', '#2040ff', '#ff00d0'],
   Sunset: ['#ff3d00', '#ff9100', '#ff2d78', '#6a1b9a'],
   Ocean: ['#001a66', '#0066ff', '#00e5ff', '#e0ffff'],
@@ -233,7 +314,7 @@ export const PALETTES = {
   'be quiet!': ['#ff5a00', '#ffb000'],
 };
 
-export const PARAMS = {
+export const PARAMS: Record<ParamKey, { label: string; min: number; max: number; step: number; unit?: string }> = {
   speed: { label: 'Speed', min: 0, max: 3, step: 0.05 },
   scale: { label: 'Size', min: 0.2, max: 4, step: 0.05 },
   angle: { label: 'Direction', min: 0, max: 360, step: 5, unit: '°' },
@@ -244,7 +325,7 @@ export const PARAMS = {
   fade: { label: 'Fade time', min: 0.1, max: 5, step: 0.1, unit: ' s' },
 };
 
-export const EFFECTS = [
+export const EFFECTS: Effect[] = [
   {
     id: 'wave',
     name: 'Wave',
@@ -797,7 +878,7 @@ export const EFFECTS = [
     params: ['speed', 'arms', 'width'],
     defaults: { speed: 1, arms: 2, width: 0.4, palette: ['#ff6a13', '#ffd166'] },
     frame({ t, lamps, out, p, pal }) {
-      const sharp = 1 + (1 - p.width) * 6, n = pal.length;
+      const sharp = 1 + (1 - p.width) * 6;
       for (let i = 0; i < lamps.length; i++) {
         const l = lamps[i];
         if (!l.bar) {
@@ -1146,7 +1227,6 @@ export const EFFECTS = [
     params: ['speed', 'density'],
     defaults: { speed: 1, density: 0.5, palette: ['#ffffff', '#ffd166', '#00e5ff'] },
     frame({ t, lamps, out, p, pal }) {
-      const n = pal.length;
       for (let i = 0; i < lamps.length; i++) {
         const l = lamps[i], x = t * p.speed * 5 + l.rnd * 97, slot = Math.floor(x);
         const on = rand(l.id, slot, 51) < p.density * 0.3;
@@ -1161,7 +1241,7 @@ export const EFFECTS = [
     params: ['speed', 'scale'],
     defaults: { speed: 1, scale: 1, palette: PALETTES.Rainbow },
     frame({ t, lamps, out, p, pal }) {
-      const ph = t * p.speed * 2, beat = Math.floor(ph), glow = 0.45 + 0.55 * Math.exp(-frac(ph) * 3), n = pal.length;
+      const ph = t * p.speed * 2, beat = Math.floor(ph), glow = 0.45 + 0.55 * Math.exp(-frac(ph) * 3);
       for (let i = 0; i < lamps.length; i++) {
         const cell = Math.floor(lamps[i].u * 8 * p.scale) + Math.floor(lamps[i].v * 3 * p.scale) * 31;
         put(out, i, pickR(pal, rand(cell, beat, 61)), glow);
@@ -1541,7 +1621,7 @@ export const EFFECTS = [
 ];
 
 // How the page groups the effects. Every effect id appears exactly once.
-export const CATEGORIES = [
+export const CATEGORIES: { id: string; name: string; effects: string[] }[] = [
   { id: 'static', name: 'Static', effects: ['paint', 'solid', 'gradient', 'rows', 'zones', 'wasd', 'confetti'] },
   {
     id: 'motion',
@@ -1573,3 +1653,13 @@ export const CATEGORIES = [
       'keyedge', 'keyspot', 'keyshadow', 'keyheat', 'keyspeed'],
   },
 ];
+
+const byId = new Map(EFFECTS.map((e) => [e.id, e]));
+
+/** The effect with this id, if there is one. */
+export const findEffect = (id: unknown): Effect | undefined => byId.get(id as string);
+
+/** The effect with this id; the first effect when the id is unknown. */
+export const effectOf = (id: string): Effect => byId.get(id) ?? EFFECTS[0];
+
+export const hexToRgb = (h: string): number[] => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];

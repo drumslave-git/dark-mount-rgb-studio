@@ -59,19 +59,20 @@ follows the next time you start the app.
 
 ## Build
 
-With the .NET SDK 8 or later:
+With the .NET SDK 8 or later and Node.js 22.18 or later:
 
 ```bash
 cd tray
 dotnet publish -c Release -o publish
 ```
 
-This writes `tray/publish/DarkMountStudio.exe`.
+This builds the settings page in `web/` (installing its npm packages the first time), embeds it
+and writes `tray/publish/DarkMountStudio.exe`.
 
 ## How it works
 
 ```
- browser tab (index.html, js/)          tray app (tray/, C#)             keyboard
+ browser tab (web/, React)              tray app (tray/, C#)             keyboard
  settings + preview  ── HTTP, JSON ──▶  settings, effects, audio,  ── HID LampArray ──▶  201 lights
                         localhost:4173  key watching, 30 fps
 ```
@@ -84,18 +85,25 @@ This writes `tray/publish/DarkMountStudio.exe`.
   effect is selected. They are used for the lights and nothing else: never logged, saved or sent
   anywhere.
 - The page is served on loopback only, and the server refuses requests that come from other sites.
-- The effects exist twice: `js/effects.js` draws the preview and `tray/Effects*.cs` drives the
-  keyboard. The two give the same numbers for the same moment.
+- The effects exist twice: `web/src/lib/effects.ts` draws the preview and `tray/Effects*.cs` drives
+  the keyboard. The two give the same numbers for the same moment.
+- The page is written in TypeScript with React and Tailwind CSS and built with Vite into three
+  static files, which are embedded in the exe. It loads nothing from the network.
 
 ### Layout
 
 | Path | What it is |
 | --- | --- |
-| `index.html`, `styles.css` | The settings page |
-| `js/app.js` | Page logic: settings, preview, painting, layer editor |
-| `js/effects.js` | All effects, palettes and their parameters (preview copy) |
-| `js/layers.js` | Layered presets |
-| `js/geometry.js`, `js/layout.js` | Where each light sits and the keyboard's lamp table |
+| `web/index.html`, `web/src/main.tsx`, `web/src/App.tsx` | The settings page |
+| `web/src/components/` | Its parts: toolbar, effect list, effect settings, layer editor, keyboard picture |
+| `web/src/index.css` | Tailwind and the page's colours |
+| `web/src/store.ts`, `web/src/settings.ts`, `web/src/actions.ts` | The page's copy of the settings and everything that changes them |
+| `web/src/tray.ts`, `web/src/clock.ts` | Talking to the tray app and keeping its time |
+| `web/src/preview.ts` | Drawing the preview, painting, picking a layer's lights |
+| `web/src/lib/effects.ts` | All effects, palettes and their parameters (preview copy) |
+| `web/src/lib/layers.ts` | Layered presets |
+| `web/src/lib/geometry.ts`, `web/src/lib/layout.ts`, `web/src/lib/board.ts` | Where each light sits and the keyboard's lamp table |
+| `web/scripts/frame.ts` | Prints one frame of the preview, for comparing with `--dump-frame` |
 | `tray/Program.cs` | Entry point and command line |
 | `tray/Engine.cs` | The loop that renders and sends frames |
 | `tray/Effects.cs`, `tray/EffectsMore.cs`, `tray/Palette.cs`, `tray/Renderer.cs` | C# port of the effects and layers |
@@ -112,11 +120,11 @@ This writes `tray/publish/DarkMountStudio.exe`.
 | Command | What it does |
 | --- | --- |
 | `DarkMountStudio.exe` | Runs the tray app (one instance only) |
-| `DarkMountStudio.exe --site <folder>` | Same, but serves the page from disk, for working on it |
+| `DarkMountStudio.exe --site <folder>` | Same, but serves a built page from disk (`web/dist`) instead of the embedded one |
 | `DarkMountStudio.exe --exit` | Asks the running tray app to quit cleanly |
 | `DarkMountStudio.exe --selftest` | Checks the keyboard, audio and the HTTP API and prints a report |
 | `DarkMountStudio.exe --audio-devices` | Lists the output devices and which one would be listened to |
-| `DarkMountStudio.exe --dump-frame <effect> <seconds> [settings JSON] [beats]` | Prints one rendered frame as JSON, for comparing with `js/effects.js` |
+| `DarkMountStudio.exe --dump-frame <effect> <seconds> [settings JSON] [beats]` | Prints one rendered frame as JSON, for comparing with `web/src/lib/effects.ts` |
 | `DarkMountStudio.exe --version` | Prints the version (`dev` for a local build) |
 
 Stop the app with **Exit** in the tray menu or with `--exit`. If the process is killed instead, the
@@ -132,17 +140,30 @@ lights stay frozen on the last frame.
 
 ## Working on it
 
-Run the tray app with `--site .` from the repository root and it serves the page straight from the
-working tree, so changes to `index.html`, `styles.css` and `js/` show up on reload. Publish again
-to embed them in the exe.
+With the tray app running, start the page's dev server:
 
-When you change an effect, change it in both `js/effects.js` and the C# port, then compare the two
-with `--dump-frame`.
+```bash
+cd web
+npm install
+npm run dev
+```
+
+It serves the page on <http://localhost:5173> with hot reload and passes the API calls on to the
+tray app, so changes in `web/src` show up at once. Publish again to embed them in the exe.
+`npm run build` type-checks the page and builds it into `web/dist`.
+
+When you change an effect, change it in both `web/src/lib/effects.ts` and the C# port, then compare
+one frame from each. They take the same arguments and must print the same bytes:
+
+```bash
+cd web
+npm run --silent frame -- wave 1
+../tray/publish/DarkMountStudio.exe --dump-frame wave 1
+```
 
 ### Releases
 
-Releases are automatic. Every push to `main` that changes the app (`tray/`, `js/`, `index.html`
-or `styles.css`) runs [the release workflow](.github/workflows/release.yml), which builds the exe,
+Releases are automatic. Every push to `main` that changes the app (`tray/` or `web/`) runs [the release workflow](.github/workflows/release.yml), which builds the exe,
 checks that it starts, and publishes a GitHub release with the zip.
 
 The version number is automatic too. It is taken from the last `vX.Y.Z` tag and the commit messages
@@ -160,5 +181,6 @@ menu.
 
 ## License
 
-[MIT](LICENSE). The exe includes [HidSharp](https://www.zer7.com/software/hidsharp) (Apache 2.0) and
-[NAudio](https://github.com/naudio/NAudio) (MIT); see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
+[MIT](LICENSE). The exe includes [HidSharp](https://www.zer7.com/software/hidsharp) (Apache 2.0),
+[NAudio](https://github.com/naudio/NAudio) (MIT), [React](https://react.dev) (MIT) and base styles
+from [Tailwind CSS](https://tailwindcss.com) (MIT); see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).

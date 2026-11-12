@@ -11,7 +11,7 @@ namespace DarkMountStudio;
 ///   GET  /api/state   { settings, status, clock }   clock = the effects' time in seconds, for the page's preview
 ///   PUT  /api/state   any subset of the settings; answers like GET
 ///   GET  /api/levels  { levels: [32 floats], beat }   beat = number of beats heard so far
-///   anything else     the page: /, /index.html, /styles.css, /js/*.js
+///   anything else     the page as Vite built it (web/): /, /index.html, /assets/*.js, /assets/*.css
 /// </summary>
 sealed partial class HttpServer : IDisposable
 {
@@ -162,7 +162,7 @@ sealed partial class HttpServer : IDisposable
     }
 
     // The only files the page consists of. Nothing else is ever read, so no path can leave the site.
-    [GeneratedRegex(@"^/(index\.html|styles\.css|js/[A-Za-z0-9_\-][A-Za-z0-9_.\-]*\.js)$")]
+    [GeneratedRegex(@"^/(index\.html|assets/[A-Za-z0-9_\-][A-Za-z0-9_.\-]*\.(js|css))$")]
     private static partial Regex SitePath();
 
     void Static(HttpListenerRequest req, HttpListenerResponse res, string path)

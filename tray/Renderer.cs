@@ -3,7 +3,7 @@ namespace DarkMountStudio;
 /// <summary>
 /// Draws frames: lays the lamps out, runs the selected effect - or, with a layered preset, each
 /// layer's effect on that layer's lights - then applies brightness and zones. The same steps as
-/// rebuildLayout() and loop() in js/app.js and js/layers.js.
+/// buildBoard() in web/src/lib/board.ts, loop() in web/src/preview.ts and web/src/lib/layers.ts.
 /// </summary>
 sealed class Renderer
 {
@@ -19,7 +19,7 @@ sealed class Renderer
         public readonly List<KeyEvent> Keys = new();  // the key presses that belong to this layer
     }
 
-    /// <summary>A layer is never treated as wider than this many times its height (js/layers.js: MAX_ASPECT).</summary>
+    /// <summary>A layer is never treated as wider than this many times its height (web/src/lib/layers.ts: MAX_ASPECT).</summary>
     const double MaxAspect = 4;
 
     readonly Frame _frame = new();
@@ -39,7 +39,7 @@ sealed class Renderer
     /// <summary>How many lamps of the current table have a known binding.</summary>
     public int Mapped { get; private set; }
 
-    /// <summary>Normalised lamp positions, as rebuildLayout() in js/app.js computes them.</summary>
+    /// <summary>Normalised lamp positions, as buildBoard() in web/src/lib/board.ts computes them.</summary>
     public static EffectLamp[] BuildLayout(RawLamp[] raw, int padSide, out int mapped)
     {
         mapped = 0;
@@ -77,7 +77,7 @@ sealed class Renderer
     /// <summary>
     /// The lights of one layer as its effect sees them: positions are measured over the layer's
     /// own extent, so the effect plays on those lights as if they were a whole keyboard
-    /// (layerLamps() in js/layers.js). ids must be valid indexes into `board`.
+    /// (layerLamps() in web/src/lib/layers.ts). ids must be valid indexes into `board`.
     /// </summary>
     public static EffectLamp[] LayerLayout(EffectLamp[] board, int[] ids)
     {

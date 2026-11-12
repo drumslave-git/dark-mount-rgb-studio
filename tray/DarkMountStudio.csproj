@@ -22,12 +22,28 @@
     <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
 
-  <!-- The settings page is embedded straight from the project folder above; rebuilding picks up changes. -->
+  <!--
+    The settings page (..\web: TypeScript, React, Tailwind) is built by Vite into ..\web\dist and
+    embedded from there. Building this project builds the page first whenever its sources changed,
+    which needs Node.js and npm. To embed ..\web\dist as it is: -p:BuildSite=false.
+  -->
+  <PropertyGroup>
+    <SiteFolder>$(MSBuildProjectDirectory)\..\web\</SiteFolder>
+    <BuildSite Condition="'$(BuildSite)' == ''">true</BuildSite>
+  </PropertyGroup>
+
   <ItemGroup>
-    <EmbeddedResource Include="..\index.html" LogicalName="site/index.html" Link="site\index.html" />
-    <EmbeddedResource Include="..\styles.css" LogicalName="site/styles.css" Link="site\styles.css" />
-    <EmbeddedResource Include="..\js\*.js" LogicalName="site/js/%(Filename)%(Extension)" Link="site\js\%(Filename)%(Extension)" />
+    <SiteSource Include="$(SiteFolder)src\**\*;$(SiteFolder)index.html;$(SiteFolder)package.json;$(SiteFolder)package-lock.json;$(SiteFolder)vite.config.ts;$(SiteFolder)tsconfig.json" />
+    <!-- Vite is set up to write exactly these three files (..\web\vite.config.ts). -->
+    <EmbeddedResource Include="$(SiteFolder)dist\index.html" LogicalName="site/index.html" Link="site\index.html" />
+    <EmbeddedResource Include="$(SiteFolder)dist\assets\app.js" LogicalName="site/assets/app.js" Link="site\assets\app.js" />
+    <EmbeddedResource Include="$(SiteFolder)dist\assets\app.css" LogicalName="site/assets/app.css" Link="site\assets\app.css" />
   </ItemGroup>
+
+  <Target Name="BuildSite" BeforeTargets="BeforeBuild" Condition="'$(BuildSite)' == 'true'" Inputs="@(SiteSource)" Outputs="$(SiteFolder)dist\index.html">
+    <Exec Command="npm ci" WorkingDirectory="$(SiteFolder)" Condition="!Exists('$(SiteFolder)node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(SiteFolder)" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.1.0" />
