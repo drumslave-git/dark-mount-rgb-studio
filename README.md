@@ -27,29 +27,46 @@ This is an unofficial hobby project. It is not affiliated with or endorsed by be
 ## Requirements
 
 - Windows (tested on Windows 11)
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) to run it
-- .NET SDK 8 or later to build it
+- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 - A be quiet! Dark Mount (USB `373F:0001`)
 
-## Build and run
+## Install and run
 
-```bash
-cd tray
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
-```
-
-This writes `tray/publish/DarkMountStudio.exe`. The settings page is embedded in the exe, so that
-one file is all you need. Start it and an icon appears in the tray:
-
-- **Double-click** the icon, or choose **Open settings**, to open the page at
-  <http://localhost:4173>.
-- **Enabled** switches the effects on and off.
-- **Start with Windows** adds or removes the app from your startup programs.
+1. Download `DarkMountStudio-vX.Y.Z.zip` from the
+   [latest release](https://github.com/drumslave-git/dark-mount-rgb-studio/releases/latest).
+2. Unzip it anywhere you can write to, for example `D:\Tools\DarkMountStudio`.
+3. Start `DarkMountStudio.exe`. An icon appears in the tray:
+   - **Double-click** the icon, or choose **Open settings**, to open the page at
+     <http://localhost:4173>.
+   - **Enabled** switches the effects on and off.
+   - **Start with Windows** adds or removes the app from your startup programs.
 
 If Windows *Dynamic Lighting* is switched on for the keyboard, switch it off. It competes for the
 same lights.
 
-Settings are saved in `%AppData%\DarkMountStudio\settings.json`.
+### Portable
+
+The app is one exe with the settings page inside it. It saves its settings in `settings.json` next
+to the exe and keeps nothing anywhere else: no AppData folder, no browser storage, no installer.
+
+- To move it, move the folder. To back it up, copy `settings.json`.
+- To update, replace `DarkMountStudio.exe` with the one from the new release.
+- To remove it, untick **Start with Windows**, exit, and delete the folder.
+
+**Start with Windows** is the one exception: ticking it adds an entry for the exe to your startup
+programs in the registry, and unticking it removes the entry. If you move the folder, the entry
+follows the next time you start the app.
+
+## Build
+
+With the .NET SDK 8 or later:
+
+```bash
+cd tray
+dotnet publish -c Release -o publish
+```
+
+This writes `tray/publish/DarkMountStudio.exe`.
 
 ## How it works
 
@@ -88,6 +105,7 @@ Settings are saved in `%AppData%\DarkMountStudio\settings.json`.
 | `tray/HttpServer.cs`, `tray/Settings.cs` | The page server, its API and the saved settings |
 | `tray/TrayApp.cs` | Tray icon and menu |
 | `tray/SelfTest.cs` | `--selftest` |
+| `.github/` | The release workflow and the script that works out the next version |
 
 ### Command line
 
@@ -99,6 +117,7 @@ Settings are saved in `%AppData%\DarkMountStudio\settings.json`.
 | `DarkMountStudio.exe --selftest` | Checks the keyboard, audio and the HTTP API and prints a report |
 | `DarkMountStudio.exe --audio-devices` | Lists the output devices and which one would be listened to |
 | `DarkMountStudio.exe --dump-frame <effect> <seconds> [settings JSON] [beats]` | Prints one rendered frame as JSON, for comparing with `js/effects.js` |
+| `DarkMountStudio.exe --version` | Prints the version (`dev` for a local build) |
 
 Stop the app with **Exit** in the tray menu or with `--exit`. If the process is killed instead, the
 lights stay frozen on the last frame.
@@ -119,3 +138,27 @@ to embed them in the exe.
 
 When you change an effect, change it in both `js/effects.js` and the C# port, then compare the two
 with `--dump-frame`.
+
+### Releases
+
+Releases are automatic. Every push to `main` that changes the app (`tray/`, `js/`, `index.html`
+or `styles.css`) runs [the release workflow](.github/workflows/release.yml), which builds the exe,
+checks that it starts, and publishes a GitHub release with the zip.
+
+The version number is automatic too. It is taken from the last `vX.Y.Z` tag and the commit messages
+since then:
+
+| Commit message | Raises | Example |
+| --- | --- | --- |
+| `feat: ...` | minor | 1.2.3 → 1.3.0 |
+| `feat!: ...`, `fix!: ...` or a `BREAKING CHANGE:` line | major | 1.2.3 → 2.0.0 |
+| anything else | patch | 1.2.3 → 1.2.4 |
+
+To release without a code change, or to choose the number yourself, run the workflow by hand under
+**Actions → Release → Run workflow**. The version of a running copy is the first line of its tray
+menu.
+
+## License
+
+[MIT](LICENSE). The exe includes [HidSharp](https://www.zer7.com/software/hidsharp) (Apache 2.0) and
+[NAudio](https://github.com/naudio/NAudio) (MIT); see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).

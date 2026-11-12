@@ -1,0 +1,100 @@
+name: Release
+
+# Every push to main that changes the app builds it and publishes a GitHub release.
+# The version is worked out from the last vX.Y.Z tag and the commit messages since then
+# (see .github/scripts/next-version.sh): "feat: ..." raises the minor number, a breaking
+# change ("feat!: ...") the major number, anything else the patch number.
+#
+# To release by hand, or to choose what to raise: Actions > Release > Run workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tray/**'
+      - 'js/**'
+      - 'index.html'
+      - 'styles.css'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: What to raise in the version number
+        type: choice
+        default: auto
+        options: [auto, patch, minor, major]
+
+permissions:
+  contents: write
+
+# One release at a time, in the order the pushes arrived.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # the version comes from the tags and the commits since the last one
+
+      - name: Work out the version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          if git tag --points-at HEAD | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::notice::This commit is already released; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="$(bash .github/scripts/next-version.sh "$BUMP")"
+          echo "Releasing v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v5
+        if: steps.version.outputs.skip != 'true'
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        if: steps.version.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet publish tray/DarkMountStudio.csproj -c Release -o dist/DarkMountStudio -p:Version="$VERSION"
+          cp LICENSE dist/DarkMountStudio/LICENSE.txt
+          cp THIRD-PARTY-NOTICES.txt dist/DarkMountStudio/
+
+      - name: Check the exe
+        if: steps.version.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          said="$(dist/DarkMountStudio/DarkMountStudio.exe --version | tr -d '\r')"
+          echo "The exe says it is version $said"
+          test "$said" = "$VERSION"
+          # One frame of an effect, rendered without a keyboard: 201 lights, 3 bytes each.
+          frame="$(dist/DarkMountStudio/DarkMountStudio.exe --dump-frame wave 1)"
+          test "$(tr -cd , <<<"$frame" | wc -c)" -eq 602
+
+      - name: Zip
+        if: steps.version.outputs.skip != 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: Compress-Archive -Path dist/DarkMountStudio -DestinationPath "dist/DarkMountStudio-v$env:VERSION.zip"
+
+      - name: Publish the release
+        if: steps.version.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" "dist/DarkMountStudio-v$VERSION.zip" \
+            --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
