@@ -61,7 +61,8 @@ are playing a made-up song and the typing effects watch made-up typing.
 
 1. Download `DarkMountStudio-vX.Y.Z.zip` from the
    [latest release](https://github.com/drumslave-git/dark-mount-rgb-studio/releases/latest).
-2. Unzip it anywhere you can write to, for example `D:\Tools\DarkMountStudio`.
+2. Unzip it anywhere you can write to, for example `D:\Tools\DarkMountStudio`. Not under
+   `Program Files`: the app could not save its settings there.
 3. Start `DarkMountStudio.exe`. An icon appears in the tray:
    - **Double-click** the icon, or choose **Open settings**, to open the page at
      <http://localhost:4173>.
@@ -77,7 +78,9 @@ The app is one exe with the settings page inside it. It saves its settings in `s
 to the exe and keeps nothing anywhere else: no AppData folder, no browser storage, no installer.
 
 - To move it, move the folder. To back it up, copy `settings.json`.
-- To update, replace `DarkMountStudio.exe` with the one from the new release.
+- To update, exit the app and replace `DarkMountStudio.exe` in the same folder with the one from
+  the new release. A copy in another folder starts with the default settings; to take yours along,
+  copy `settings.json` into that folder while the app is not running.
 - To remove it, untick **Start with Windows**, exit, and delete the folder.
 
 **Start with Windows** is the one exception: ticking it adds an entry for the exe to your startup

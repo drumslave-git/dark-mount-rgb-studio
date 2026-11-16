@@ -26,8 +26,10 @@ cd tray
 dotnet publish -c Release -o publish
 ```
 
-- `tray/publish/` is the owner's live install: `settings.json` in it holds their real settings.
-  Publish over it, but never delete the folder or that file.
+- The owner runs a release build from `D:\Apps\DarkMountStudio\` (Start with Windows points
+  there); `settings.json` in that folder holds their real settings. Leave that folder to the
+  owner. `tray/publish/` is the dev build: publish over it, but never delete the folder or its
+  `settings.json` (an older copy of the owner's settings).
 - Building the exe builds the page first (`npm ci` if needed, then `npm run build` in `web/`; the
   `BuildSite` target in the csproj) and embeds `web/dist`, so it needs Node.js 22.18 or later.
   Publish again after editing anything in `web/`.
@@ -37,14 +39,17 @@ dotnet publish -c Release -o publish
   from disk instead.
 - `npm run build` type-checks with `tsc` and must stay free of errors. Vite must keep writing
   exactly `index.html`, `assets/app.js` and `assets/app.css`: the csproj embeds those by name.
-- The app is single-instance and usually already running (Start with Windows). Stop it with
-  `DarkMountStudio.exe --exit` before publishing and start it again afterwards. Never kill the
-  process: the lights freeze on the last frame.
+- The app is single-instance and the owner's copy is usually running. Publishing only needs the
+  dev copy stopped. To try a dev build, stop the running copy with `DarkMountStudio.exe --exit`
+  and start `tray/publish/DarkMountStudio.exe`; when done, stop it the same way and start
+  `D:\Apps\DarkMountStudio\DarkMountStudio.exe` again. Each copy points Start with Windows at
+  itself when it starts (`Autostart.FollowMove`), so always end with the owner's copy running.
+  Never kill the process: the lights freeze on the last frame.
 - `--selftest` drives the real keyboard for about 8 s and checks the HTTP API. It uses default
   settings in memory and does not touch `settings.json`.
-- Testing through the page changes the real `tray/publish/settings.json` (through the dev server
-  too). Note the values you change and put them back afterwards, through the page or the HTTP API.
-  Never write `settings.json` while the app runs: it keeps its settings in memory, never reads the
+- Testing through the page (the dev server too) changes the `settings.json` of whichever copy is
+  running. With the owner's copy those are their real settings: note the values you change and
+  put them back afterwards, through the page or the HTTP API. Never write `settings.json` while the app runs: it keeps its settings in memory, never reads the
   file again and saves over it, or loads the stale file on its next start.
 - There is no test suite. `dotnet build` must stay free of warnings.
 
