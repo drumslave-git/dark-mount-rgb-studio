@@ -62,7 +62,8 @@ are playing a made-up song and the typing effects watch made-up typing.
 1. Download `DarkMountStudio-vX.Y.Z.zip` from the
    [latest release](https://github.com/drumslave-git/dark-mount-rgb-studio/releases/latest).
 2. Unzip it anywhere you can write to, for example `D:\Tools\DarkMountStudio`. Not under
-   `Program Files`: the app could not save its settings there.
+   `Program Files`: the app could not save its settings there, and the tray icon and the settings
+   page would say so.
 3. Start `DarkMountStudio.exe`. An icon appears in the tray:
    - **Double-click** the icon, or choose **Open settings**, to open the page at
      <http://localhost:4173>.
@@ -178,6 +179,7 @@ lights stay frozen on the last frame.
 is a PNG as a `data:` URL (or `""`), `color` the backlight as `#rrggbb`. A `PUT` merges it key by key
 and field by field, and `null` for a key makes the app stop changing it. `status.displayKeys` says
 for each key whether its picture is `waiting`, `sending`, `done` or `failed` (`""`: not set).
+`status.settingsProblem` says why changes are not being saved to `settings.json` (`""`: they are).
 
 ## Working on it
 

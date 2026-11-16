@@ -19,6 +19,7 @@ export interface TrayStatus {
   driving?: boolean;
   displayKeys?: string[]; // per display key: '' (not set), 'waiting', 'sending', 'done' or 'failed' (unusable picture)
   displayKeysProblem?: string; // why pictures that are waiting do not go out, '' when nothing is wrong
+  settingsProblem?: string; // why changes are not being saved to settings.json, '' when they are
 }
 
 export interface State {

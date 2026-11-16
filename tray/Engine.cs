@@ -5,10 +5,11 @@ namespace DarkMountStudio;
 
 /// <summary>
 /// What the settings page and the tray tooltip get to see. DisplayKeys and DisplayKeysProblem:
-/// see <see cref="DisplayKeyWriter.States"/> and <see cref="DisplayKeyWriter.Problem"/>.
+/// see <see cref="DisplayKeyWriter.States"/> and <see cref="DisplayKeyWriter.Problem"/>;
+/// SettingsProblem: <see cref="SettingsStore.SaveProblem"/>.
 /// </summary>
 sealed record EngineStatus(bool Keyboard, int Lamps, int[]? Bindings, string Audio, string Keys, bool Driving,
-    string[]? DisplayKeys = null, string DisplayKeysProblem = "");
+    string[]? DisplayKeys = null, string DisplayKeysProblem = "", string SettingsProblem = "");
 
 /// <summary>
 /// The background loop: finds the keyboard, captures audio when an audio effect is selected,
@@ -55,7 +56,10 @@ sealed class Engine : IDisposable
     /// <summary>Self-test: send every frame, even when it equals the previous one.</summary>
     public bool AlwaysSend { get; init; }
 
-    public EngineStatus Status => _status with { DisplayKeys = _displayKeys.States, DisplayKeysProblem = _displayKeys.Problem };
+    public EngineStatus Status => _status with
+    {
+        DisplayKeys = _displayKeys.States, DisplayKeysProblem = _displayKeys.Problem, SettingsProblem = _store.SaveProblem,
+    };
     /// <summary>The 32 band levels the audio effects see (a fresh array each frame; do not modify).</summary>
     public float[] Levels => _publishedLevels;
     /// <summary>How many beats have been heard in the sound so far (see <see cref="BeatDetector"/>).</summary>

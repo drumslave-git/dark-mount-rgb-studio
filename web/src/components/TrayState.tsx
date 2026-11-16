@@ -18,7 +18,13 @@ export function StatusLine() {
     else if (!status?.keyboard) text = 'Tray app running — keyboard not found. Plug it in and it will be picked up.';
     else text = `Tray app running — ${status.lamps} lights connected${enabled ? '' : ', effects switched off'}. You can close this tab; the effect keeps running.`;
   }
-  return <p className={cx('mt-0.5 text-hint', ok === null ? 'text-muted' : ok ? 'text-ok' : 'text-danger')}>{text}</p>;
+  const saveProblem = reachable ? status?.settingsProblem : '';
+  return (
+    <>
+      <p className={cx('mt-0.5 text-hint', ok === null ? 'text-muted' : ok ? 'text-ok' : 'text-danger')}>{text}</p>
+      {saveProblem && <p className="mt-0.5 text-hint font-semibold text-danger">{saveProblem}</p>}
+    </>
+  );
 }
 
 /** Whether the tray app hears anything, for the audio effects. */

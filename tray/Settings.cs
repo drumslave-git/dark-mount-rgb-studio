@@ -397,12 +397,19 @@ sealed class SettingsStore : IDisposable
     readonly string? _path;
     readonly System.Threading.Timer _saveTimer;
     volatile Settings _current;
+    volatile string _saveProblem = "";
     bool _dirty;
 
     /// <summary>Raised (on the changing thread) after the settings changed.</summary>
     public event Action? Changed;
 
     public Settings Current => _current;
+
+    /// <summary>
+    /// Why changes are not being saved, "" when they are. Checked when the app starts (so it shows
+    /// before anything is changed) and again by every save.
+    /// </summary>
+    public string SaveProblem => _saveProblem;
 
     /// <summary>persist = false starts from the defaults and keeps everything in memory (used by the self-test).</summary>
     public SettingsStore(bool persist = true)
@@ -424,6 +431,35 @@ sealed class SettingsStore : IDisposable
             // unreadable settings: start from the defaults
         }
         _current = s;
+        if (_path != null) _saveProblem = ProbeFolder(_path);
+    }
+
+    /// <summary>
+    /// Whether a save could work, without touching settings.json: creates and deletes the temporary
+    /// file a save writes first. A folder only administrators may write to (Program Files) fails here.
+    /// </summary>
+    static string ProbeFolder(string path)
+    {
+        try
+        {
+            string tmp = path + ".tmp";
+            using (new FileStream(tmp, FileMode.Create, FileAccess.Write)) { }
+            File.Delete(tmp);
+            return "";
+        }
+        catch (Exception e)
+        {
+            return Problem(path, e);
+        }
+    }
+
+    static string Problem(string path, Exception e)
+    {
+        string folder = Path.GetDirectoryName(path) ?? path;
+        return e is UnauthorizedAccessException
+            ? $"Settings cannot be saved: Windows does not let the app write to {folder}, so changes are lost when it closes. " +
+              "Move the app's folder somewhere you can write to (not Program Files) and start it from there."
+            : $"Settings could not be saved in {folder}, so changes are lost when the app closes: {e.Message}";
     }
 
     public Settings Update(Action<Settings> change)
@@ -453,10 +489,12 @@ sealed class SettingsStore : IDisposable
                 string tmp = _path + ".tmp";
                 File.WriteAllText(tmp, JsonSerializer.Serialize(_current, Settings.Json));
                 File.Move(tmp, _path, true);
+                _saveProblem = "";
             }
-            catch
+            catch (Exception e)
             {
                 // settings stay in memory; the next change tries again
+                _saveProblem = Problem(_path, e);
             }
         }
     }

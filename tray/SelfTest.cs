@@ -298,7 +298,7 @@ static class SelfTest
                 var liveStatus = liveDoc.RootElement.GetProperty("status");
                 Check("/api/state exposes no key data, only the state word",
                     Names(liveDoc.RootElement) == "settings,status,clock,instance" &&
-                    Names(liveStatus) == "keyboard,lamps,bindings,audio,keys,driving,displayKeys,displayKeysProblem" &&
+                    Names(liveStatus) == "keyboard,lamps,bindings,audio,keys,driving,displayKeys,displayKeysProblem,settingsProblem" &&
                     liveStatus.GetProperty("keys").ValueKind == JsonValueKind.String &&
                     Names(liveDoc.RootElement.GetProperty("settings")) == "enabled,effect,params,brightness,zones,numpadSide,paint,paintPresets,paintColor,handBackWhenSilent,gamma,mode,layerPreset,layerPresets,displayKeys" &&
                     !live.Body.Contains("events", StringComparison.OrdinalIgnoreCase),

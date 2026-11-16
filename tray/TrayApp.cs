@@ -16,6 +16,7 @@ sealed class TrayApp : ApplicationContext
     readonly Icon _iconOn = DrawIcon(Color.FromArgb(0xff, 0x6a, 0x13)), _iconOff = DrawIcon(Color.Gray);
     readonly ToolStripMenuItem _enabled, _autostart;
     readonly System.Windows.Forms.Timer _timer;
+    bool _toldSaveProblem;
 
     public TrayApp(SettingsStore store, Engine engine, HttpServer server, EventWaitHandle exitSignal)
     {
@@ -44,6 +45,7 @@ sealed class TrayApp : ApplicationContext
 
         _icon = new NotifyIcon { Icon = _iconOn, ContextMenuStrip = menu, Visible = true };
         _icon.DoubleClick += (_, _) => OpenSettings();
+        _icon.BalloonTipClicked += (_, _) => OpenSettings();
 
         _timer = new System.Windows.Forms.Timer { Interval = 500 };
         _timer.Tick += (_, _) => Refresh();
@@ -67,7 +69,14 @@ sealed class TrayApp : ApplicationContext
             : "running";
         string text = $"{Program.AppName} — {state}";
         if (!_server.Running) text += $" (settings page unavailable: port {HttpServer.Port} is in use)";
+        if (status.SettingsProblem != "") text += " — cannot save settings";
         if (_icon.Text != text) _icon.Text = text;
+        // Said once each time saving stops working; the page and the tooltip keep saying it.
+        if (status.SettingsProblem != "" && !_toldSaveProblem)
+            _icon.ShowBalloonTip(15000, Program.AppName,
+                "Your settings cannot be saved in this folder, so changes are lost when the app closes. " +
+                "Open settings for what to do.", ToolTipIcon.Warning);
+        _toldSaveProblem = status.SettingsProblem != "";
         var icon = s.Enabled && status.Keyboard ? _iconOn : _iconOff;
         if (!ReferenceEquals(_icon.Icon, icon)) _icon.Icon = icon;
     }
