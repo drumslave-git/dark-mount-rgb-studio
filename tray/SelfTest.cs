@@ -67,6 +67,8 @@ static class SelfTest
                 curve[0] == 0 && curve[255] == 255 && curve[20] == 2 && curve[128] == 55 && curve.Zip(curve.Skip(1)).All(p => p.First <= p.Second),
                 $"20 -> {curve[20]}, 128 -> {curve[128]}, 200 -> {curve[200]}; in use: {store.Current.Gamma}");
 
+            DisplayKeys(keyboard);
+
             Console.WriteLine();
             Console.WriteLine("Audio (4 s of WASAPI loopback, effect \"audio\")");
             var peaks = new float[Spectrum.Bands];
@@ -117,6 +119,75 @@ static class SelfTest
         Console.WriteLine();
         Console.WriteLine(_ok ? "SELF-TEST PASSED" : "SELF-TEST FAILED");
         return !keyboard ? 2 : _ok ? 0 : 3;
+    }
+
+    /// <summary>
+    /// The display keys' settings and pictures, worked out in memory; on the keyboard only reads
+    /// (writing would wear its flash and change the user's pictures).
+    /// </summary>
+    static void DisplayKeys(bool keyboard)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Display keys");
+
+        // A 120 × 120 picture, transparent but for an opaque white square in its top left corner.
+        string image;
+        using (var picture = new Bitmap(DisplayKeyWriter.Size, DisplayKeyWriter.Size, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+        using (var file = new MemoryStream())
+        {
+            using (var g = Graphics.FromImage(picture))
+            {
+                g.Clear(Color.Transparent);
+                g.FillRectangle(Brushes.White, 0, 0, 40, 40);
+            }
+            picture.Save(file, System.Drawing.Imaging.ImageFormat.Png);
+            image = "data:image/png;base64," + Convert.ToBase64String(file.ToArray());
+        }
+
+        var s = Settings.Defaults();
+        void Apply(string json)
+        {
+            using var doc = JsonDocument.Parse(json);
+            s.Apply(doc.RootElement);
+        }
+        Apply("{\"displayKeys\":{\"1\":{\"image\":\"" + image + "\",\"color\":\"#0080FF\"},\"2\":{\"color\":\"red\"},\"9\":{\"color\":\"#ffffff\"},\"x\":{}}}");
+        Apply("{\"displayKeys\":{\"2\":{\"image\":\"data:text/html;base64,AAAA\",\"color\":\"#00ff00\"},\"3\":{\"color\":\"#123456\"}}}");
+        Apply("{\"displayKeys\":{\"3\":null}}");
+        var keys = s.DisplayKeys;
+        Check("displayKeys merged per key and field, bad values ignored, null forgets a key",
+            keys.Count == 2 && keys["1"].Image == image && keys["1"].Color == "#0080ff" && keys["2"].Image == "" && keys["2"].Color == "#00ff00",
+            string.Join(", ", keys.Select(kv => $"{kv.Key}: {kv.Value.Color}{(kv.Value.Image == "" ? "" : " + image")}")));
+
+        // Upright, the white square is top left; the keyboard stores the picture turned clockwise, so top right.
+        byte[] jpeg = DisplayKeyWriter.Compose(keys["1"]);
+        using var decoded = new Bitmap(new MemoryStream(jpeg));
+        Color square = decoded.GetPixel(100, 20), backlight = decoded.GetPixel(20, 100);
+        static bool Near(Color c, int r, int g, int b) => Math.Abs(c.R - r) <= 6 && Math.Abs(c.G - g) <= 6 && Math.Abs(c.B - b) <= 6;
+        Check("picture over its backlight colour, turned clockwise, as a 120 × 120 JPEG",
+            decoded.Width == 120 && decoded.Height == 120 && Near(square, 255, 255, 255) && Near(backlight, 0, 128, 255),
+            $"{jpeg.Length} bytes; square {square.R},{square.G},{square.B}, backlight {backlight.R},{backlight.G},{backlight.B}");
+        Check("same settings give the same bytes (nothing is written again)", DisplayKeyWriter.Compose(keys["1"]).AsSpan().SequenceEqual(jpeg));
+
+        if (!keyboard) return;
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            using var link = QLink.TryOpen();
+            Check("vendor channel (usage page FF00) opened, session started", link != null);
+            if (link == null) return;
+            bool numpad = link.NumpadAttached();
+            Console.WriteLine($"  numpad module attached: {(numpad ? "yes" : "no")}");
+            if (numpad)
+            {
+                var (size, w, h, format) = link.ImageHeader(109);
+                Check("display key 1 holds a picture the keyboard reports as 120 × 120 JPEG", w == 120 && h == 120 && format == QLink.FormatJpeg,
+                    $"{size} bytes, {w} × {h}, format {format}, read in {clock.ElapsedMilliseconds} ms");
+            }
+        }
+        catch (Exception e)
+        {
+            Check("vendor channel", false, e.GetType().Name + ": " + e.Message);
+        }
     }
 
     static void Http(Engine engine)
@@ -226,10 +297,10 @@ static class SelfTest
                 string Names(JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name));
                 var liveStatus = liveDoc.RootElement.GetProperty("status");
                 Check("/api/state exposes no key data, only the state word",
-                    Names(liveDoc.RootElement) == "settings,status,clock" &&
-                    Names(liveStatus) == "keyboard,lamps,bindings,audio,keys,driving" &&
+                    Names(liveDoc.RootElement) == "settings,status,clock,instance" &&
+                    Names(liveStatus) == "keyboard,lamps,bindings,audio,keys,driving,displayKeys,displayKeysProblem" &&
                     liveStatus.GetProperty("keys").ValueKind == JsonValueKind.String &&
-                    Names(liveDoc.RootElement.GetProperty("settings")) == "enabled,effect,params,brightness,zones,numpadSide,paint,paintPresets,paintColor,handBackWhenSilent,gamma,mode,layerPreset,layerPresets" &&
+                    Names(liveDoc.RootElement.GetProperty("settings")) == "enabled,effect,params,brightness,zones,numpadSide,paint,paintPresets,paintColor,handBackWhenSilent,gamma,mode,layerPreset,layerPresets,displayKeys" &&
                     !live.Body.Contains("events", StringComparison.OrdinalIgnoreCase),
                     $"status fields: {Names(liveStatus)}");
             }

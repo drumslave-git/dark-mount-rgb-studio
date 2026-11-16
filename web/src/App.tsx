@@ -4,6 +4,7 @@
 // lights and keeps running the chosen effect - or layered preset - after the page is closed.
 
 import { useState } from 'react';
+import { DisplayKeys } from './components/DisplayKeys.tsx';
 import { EffectPicker, categoryOf } from './components/EffectPicker.tsx';
 import { EffectSettings } from './components/EffectSettings.tsx';
 import { LayerList, LayerSettings } from './components/Layers.tsx';
@@ -61,6 +62,7 @@ function Controls() {
           </>
         )}
       </div>
+      <DisplayKeys />
     </>
   );
 }

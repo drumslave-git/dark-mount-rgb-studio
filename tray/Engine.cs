@@ -3,8 +3,12 @@ using System.Runtime.InteropServices;
 
 namespace DarkMountStudio;
 
-/// <summary>What the settings page and the tray tooltip get to see.</summary>
-sealed record EngineStatus(bool Keyboard, int Lamps, int[]? Bindings, string Audio, string Keys, bool Driving);
+/// <summary>
+/// What the settings page and the tray tooltip get to see. DisplayKeys and DisplayKeysProblem:
+/// see <see cref="DisplayKeyWriter.States"/> and <see cref="DisplayKeyWriter.Problem"/>.
+/// </summary>
+sealed record EngineStatus(bool Keyboard, int Lamps, int[]? Bindings, string Audio, string Keys, bool Driving,
+    string[]? DisplayKeys = null, string DisplayKeysProblem = "");
 
 /// <summary>
 /// The background loop: finds the keyboard, captures audio when an audio effect is selected,
@@ -30,6 +34,7 @@ sealed class Engine : IDisposable
     readonly Spectrum _spectrum = new();
     readonly BeatDetector _beats = new();
     readonly Renderer _renderer = new();
+    readonly DisplayKeyWriter _displayKeys;
     readonly float[] _samples = new float[Spectrum.FftSize];
     readonly float[] _levels = new float[Spectrum.Bands];
     byte[] _led = []; // the frame as sent when Settings.Gamma is on
@@ -50,7 +55,7 @@ sealed class Engine : IDisposable
     /// <summary>Self-test: send every frame, even when it equals the previous one.</summary>
     public bool AlwaysSend { get; init; }
 
-    public EngineStatus Status => _status;
+    public EngineStatus Status => _status with { DisplayKeys = _displayKeys.States, DisplayKeysProblem = _displayKeys.Problem };
     /// <summary>The 32 band levels the audio effects see (a fresh array each frame; do not modify).</summary>
     public float[] Levels => _publishedLevels;
     /// <summary>How many beats have been heard in the sound so far (see <see cref="BeatDetector"/>).</summary>
@@ -76,11 +81,16 @@ sealed class Engine : IDisposable
     {
         _store = store;
         _keys = new KeyWatcher(() => _clock.Elapsed.TotalSeconds);
+        _displayKeys = new DisplayKeyWriter(store);
         _store.Changed += Wake;
         _thread = new Thread(Run) { IsBackground = true, Name = "Lighting engine" };
     }
 
-    public void Start() => _thread.Start();
+    public void Start()
+    {
+        _thread.Start();
+        _displayKeys.Start();
+    }
 
     void Wake() => _wake.Set();
 
@@ -271,6 +281,7 @@ sealed class Engine : IDisposable
             if (lamps[id].Binding is > 0 and < 256) lampByBinding[lamps[id].Binding] = id;
         _lampByBinding = lampByBinding;
         _keys.Clear();
+        _displayKeys.KeyboardFound();
     }
 
     /// <summary>Hands the lights back to the keyboard (report [6, 1]) and closes it.</summary>
@@ -294,6 +305,7 @@ sealed class Engine : IDisposable
         _driving = false;
         _lamps = null;
         _bindings = null;
+        _displayKeys.KeyboardLost();
     }
 
     void SetTimerResolution(bool fast)
@@ -322,5 +334,6 @@ sealed class Engine : IDisposable
             finally { Monitor.Exit(_hidGate); }
         }
         _store.Changed -= Wake;
+        _displayKeys.Dispose();
     }
 }

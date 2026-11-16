@@ -49,13 +49,17 @@ async function pull() {
 // Queues a change for the tray app. `patch` has the same shape as the settings object.
 export function push(patch: SettingsPatch) {
   pending ??= {};
-  const { params, zones, ...rest } = patch;
+  const { params, zones, displayKeys, ...rest } = patch;
   Object.assign(pending, rest);
   if (params) {
     pending.params ??= {};
     for (const [id, p] of Object.entries(params)) pending.params[id] = { ...pending.params[id], ...p };
   }
   if (zones) pending.zones = { ...pending.zones, ...zones };
+  if (displayKeys) {
+    pending.displayKeys ??= {};
+    for (const [n, key] of Object.entries(displayKeys)) pending.displayKeys[n] = key && { ...pending.displayKeys[n], ...key };
+  }
   clearTimeout(pushTimer);
   pushTimer = window.setTimeout(flush, 120);
 }
@@ -87,6 +91,25 @@ async function flush() {
 
 /** Asks again in a moment: sound capture and key watching start on demand. */
 export const refreshStatusSoon = () => void setTimeout(() => pull(), 900);
+
+let watching = 0;
+let watchUntil = 0;
+
+/**
+ * Asks twice a second while the tray app is getting pictures onto the display keys (it waits for
+ * changes to settle, then takes a second or two per key), so the page can say how far it is.
+ */
+export function watchDisplayKeys() {
+  watchUntil = performance.now() + 2500; // at least this long after the last change, which may still be on its way
+  if (watching) return;
+  const tick = async () => {
+    await pull();
+    const { status } = getState();
+    const busy = !status?.displayKeysProblem && status?.displayKeys?.some((k) => k === 'waiting' || k === 'sending');
+    watching = busy || performance.now() < watchUntil ? window.setTimeout(tick, 500) : 0;
+  };
+  watching = window.setTimeout(tick, 500);
+}
 
 /** Reads the settings once, then keeps an eye on the tray app's status. */
 export async function connect() {

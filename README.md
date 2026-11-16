@@ -18,6 +18,9 @@ This is an unofficial hobby project. It is not affiliated with or endorsed by be
 - **Typing effects** react to key presses on the Dark Mount itself.
 - **Paint**: colour single keys by hand and save the result as a preset.
 - **Layers**: split the lights into groups and run a different effect on each one.
+- **Display keys**: put your own pictures on the eight keys with screens on the numpad module. Pick
+  a PNG and a backlight colour, which shows wherever the picture is transparent. The keyboard
+  stores the pictures, so they stay when the app is not running.
 - **Live preview** of the whole board, with the numpad module on either side, in step with the
   keyboard.
 - Lights the keys, the edge bars and the numpad module, each of which can be switched off.
@@ -105,6 +108,9 @@ and writes `tray/publish/DarkMountStudio.exe`.
   sends every frame over USB with [HidSharp](https://www.zer7.com/software/hidsharp).
 - Sound is captured from the output device with WASAPI loopback
   ([NAudio](https://github.com/naudio/NAudio)) and turned into 32 frequency bands plus a beat count.
+- Display-key pictures go to the keyboard's vendor interface, the one the official configurator
+  uses, and are stored on the keyboard. Each picture is written only when it has changed, because
+  every write goes to the keyboard's flash memory.
 - Key presses come from Windows Raw Input, filtered to the Dark Mount, and only while a typing
   effect is selected. They are used for the lights and nothing else: never logged, saved or sent
   anywhere.
@@ -119,10 +125,11 @@ and writes `tray/publish/DarkMountStudio.exe`.
 | Path | What it is |
 | --- | --- |
 | `web/index.html`, `web/src/main.tsx`, `web/src/App.tsx` | The settings page |
-| `web/src/components/` | Its parts: toolbar, effect list, effect settings, layer editor, keyboard picture |
+| `web/src/components/` | Its parts: toolbar, effect list, effect settings, layer editor, display keys, keyboard picture |
 | `web/src/index.css` | Tailwind and the page's colours |
 | `web/src/store.ts`, `web/src/settings.ts`, `web/src/actions.ts` | The page's copy of the settings and everything that changes them |
 | `web/src/tray.ts`, `web/src/clock.ts` | Talking to the tray app and keeping its time |
+| `web/src/picture.ts` | Fitting a picture into a display key's 120 × 120 pixels |
 | `web/src/preview.ts` | Drawing the preview, painting, picking a layer's lights |
 | `web/src/lib/effects.ts` | All effects, palettes and their parameters (preview copy) |
 | `web/src/lib/layers.ts` | Layered presets |
@@ -135,6 +142,7 @@ and writes `tray/publish/DarkMountStudio.exe`.
 | `tray/Keyboard.cs` | HID LampArray access |
 | `tray/AudioCapture.cs`, `tray/Spectrum.cs` | Sound capture, frequency bands, beat detection |
 | `tray/KeyWatcher.cs` | Key presses for the typing effects |
+| `tray/DisplayKeys.cs`, `tray/QLink.cs`, `tray/Jpeg.cs` | Display-key pictures: putting them together, the keyboard's vendor interface, a JPEG encoder |
 | `tray/HttpServer.cs`, `tray/Settings.cs` | The page server, its API and the saved settings |
 | `tray/TrayApp.cs` | Tray icon and menu |
 | `tray/SelfTest.cs` | `--selftest` |
@@ -162,6 +170,11 @@ lights stay frozen on the last frame.
 | `GET /api/state` | `{ settings, status, clock, instance }` |
 | `PUT /api/state` | Takes any part of the settings object, answers like `GET` |
 | `GET /api/levels` | `{ levels: [32 numbers], beat }` |
+
+`displayKeys` in the settings maps `"1"` to `"8"` (1–4 the back row) to `{ image, color }`: `image`
+is a PNG as a `data:` URL (or `""`), `color` the backlight as `#rrggbb`. A `PUT` merges it key by key
+and field by field, and `null` for a key makes the app stop changing it. `status.displayKeys` says
+for each key whether its picture is `waiting`, `sending`, `done` or `failed` (`""`: not set).
 
 ## Working on it
 

@@ -66,6 +66,15 @@ sealed class LayeredPreset
     public List<Layer> Layers { get; set; } = new();
 }
 
+/// <summary>What one of the eight display keys on the numpad module shows (see <see cref="DisplayKeyWriter"/>).</summary>
+sealed record DisplayKey
+{
+    /// <summary>A PNG or JPEG as a data: URL (the page sends 120 × 120 PNGs), or "" for the backlight colour alone.</summary>
+    public string Image { get; init; } = "";
+    /// <summary>#rrggbb, shown wherever the image is transparent.</summary>
+    public string Color { get; init; } = "#000000";
+}
+
 /// <summary>
 /// The settings object shared with the settings page (JSON names are the camelCase property names).
 /// Instances are treated as immutable once published by <see cref="SettingsStore"/>.
@@ -87,6 +96,11 @@ sealed partial class Settings
     public string Mode { get; set; } = "effect"; // "effect" = Effect on every light, "layers" = the selected layered preset
     public int LayerPreset { get; set; }         // index into LayerPresets
     public List<LayeredPreset> LayerPresets { get; set; } = new();
+    /// <summary>
+    /// "1" to "8" (1-4 the back row) -> what that display key shows. A key that is not listed keeps
+    /// whatever picture it has. Never modified once parsed; a change replaces the dictionary.
+    /// </summary>
+    public IReadOnlyDictionary<string, DisplayKey> DisplayKeys { get; set; } = new Dictionary<string, DisplayKey>();
 
     /// <summary>The layers to draw, or null when a single effect runs on the whole board.</summary>
     [JsonIgnore]
@@ -104,6 +118,11 @@ sealed partial class Settings
 
     [GeneratedRegex("^#[0-9a-fA-F]{6}$")]
     private static partial Regex HexColour();
+
+    [GeneratedRegex("^data:image/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$")]
+    private static partial Regex ImageUrl();
+
+    const int MaxImageLength = 400_000; // characters of the data: URL; a 120 × 120 PNG is far smaller
 
     /// <summary>Defaults, with every effect's parameters filled in.</summary>
     public static Settings Defaults()
@@ -147,6 +166,7 @@ sealed partial class Settings
         s.Paint = new Dictionary<string, string>(Paint);
         s.PaintPresets = PaintPresets.ToDictionary(kv => kv.Key, kv => new Dictionary<string, string>(kv.Value));
         s.LayerPresets = new List<LayeredPreset>(LayerPresets); // the presets themselves are never modified
+        // DisplayKeys is shared as it is: it is never modified, only replaced (DisplayKeyWriter relies on that).
         s.Params = Params.ToDictionary(kv => kv.Key, kv =>
         {
             var p = new EffectParams { Palette = (string[]?)kv.Value.Palette?.Clone(), Random = kv.Value.Random };
@@ -158,8 +178,9 @@ sealed partial class Settings
 
     /// <summary>
     /// Applies any subset of the settings from JSON. Top-level keys replace, except `params`
-    /// (merged per effect and per key) and `zones` (merged per key). Unknown or badly typed
-    /// values are ignored, numbers are clamped to their range.
+    /// (merged per effect and per key), `zones` (merged per key) and `displayKeys` (merged per key
+    /// and per field; null for a key forgets it). Unknown or badly typed values are ignored,
+    /// numbers are clamped to their range.
     /// </summary>
     public void Apply(JsonElement patch)
     {
@@ -223,6 +244,9 @@ sealed partial class Settings
                         presets[name] = ParsePaint(kv.Value);
                     }
                     PaintPresets = presets;
+                    break;
+                case "displayKeys" when v.ValueKind == JsonValueKind.Object:
+                    DisplayKeys = MergeDisplayKeys(DisplayKeys, v);
                     break;
             }
         }
@@ -307,6 +331,34 @@ sealed partial class Settings
                 paint[id.ToString(CultureInfo.InvariantCulture)] = kv.Value.GetString()!.ToLowerInvariant();
         }
         return paint;
+    }
+
+    /// <summary>
+    /// { "1".."8": { image, color } or null }, over the keys there are. A key that is not mentioned
+    /// stays; a new key starts with no image on black; a bad image or colour is ignored.
+    /// </summary>
+    static Dictionary<string, DisplayKey> MergeDisplayKeys(IReadOnlyDictionary<string, DisplayKey> current, JsonElement v)
+    {
+        var keys = new Dictionary<string, DisplayKey>(current);
+        foreach (var kv in v.EnumerateObject())
+        {
+            if (!int.TryParse(kv.Name, NumberStyles.None, CultureInfo.InvariantCulture, out int n) || n is < 1 or > DisplayKeyWriter.Count) continue;
+            string name = n.ToString(CultureInfo.InvariantCulture);
+            if (kv.Value.ValueKind == JsonValueKind.Null)
+            {
+                keys.Remove(name);
+                continue;
+            }
+            if (kv.Value.ValueKind != JsonValueKind.Object) continue;
+            var key = keys.GetValueOrDefault(name) ?? new DisplayKey();
+            if (kv.Value.TryGetProperty("color", out var c) && c.ValueKind == JsonValueKind.String && HexColour().IsMatch(c.GetString()!))
+                key = key with { Color = c.GetString()!.ToLowerInvariant() };
+            if (kv.Value.TryGetProperty("image", out var i) && i.ValueKind == JsonValueKind.String &&
+                i.GetString() is { } image && (image.Length == 0 || (image.Length <= MaxImageLength && ImageUrl().IsMatch(image))))
+                key = key with { Image = image };
+            keys[name] = key;
+        }
+        return keys;
     }
 
     static bool IsBool(JsonElement v) => v.ValueKind is JsonValueKind.True or JsonValueKind.False;

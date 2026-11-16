@@ -6,9 +6,10 @@ import { effectOf } from './lib/effects.ts';
 import type { StoredParams } from './lib/effects.ts';
 import { MAX_LAYERS, MAX_LAYER_PRESETS, freeName, makeLayer } from './lib/layers.ts';
 import type { Layer, LayerPreset } from './lib/layers.ts';
-import type { Mode, Painting, Settings, SettingsPatch, Zone } from './settings.ts';
+import { fitPicture } from './picture.ts';
+import type { DisplayKey, Mode, Painting, Settings, SettingsPatch, Zone } from './settings.ts';
 import { getState, setState } from './store.ts';
-import { push, refreshStatusSoon } from './tray.ts';
+import { push, refreshStatusSoon, watchDisplayKeys } from './tray.ts';
 
 const MAX_PAINTINGS = 50;
 
@@ -219,3 +220,37 @@ export function addLightGroup(n: number) {
 }
 
 export const removeAllLights = () => assignLamps(selectedPreset()?.layers[getState().selectedLayer]?.lamps ?? [], true);
+
+// ------------------------------------------------------------- display keys
+// The eight keys with screens on the numpad module. The tray app writes their pictures to the
+// keyboard, which then shows them on its own.
+
+const BLACK = '#000000';
+
+// `send`: what the tray app is told, when less than the whole key.
+function changeDisplayKey(n: number, key: DisplayKey | null, send: Partial<DisplayKey> | null = key) {
+  const displayKeys = { ...settings().displayKeys };
+  if (key) displayKeys[n] = key;
+  else delete displayKeys[n];
+  change({ displayKeys }, { displayKeys: { [n]: send } });
+  watchDisplayKeys();
+}
+
+/** Puts the picture in `file` on key `n` (1-8), fitted into 120 × 120. Rejects when the browser cannot read the file. */
+export async function setDisplayKeyPicture(n: number, file: Blob) {
+  const image = await fitPicture(file);
+  changeDisplayKey(n, { image, color: settings().displayKeys[n]?.color ?? BLACK });
+}
+
+/** The colour that fills the transparent parts of key `n`'s picture (the whole key when it has none). */
+export function setDisplayKeyColor(n: number, color: string) {
+  const key = settings().displayKeys[n];
+  if (key) changeDisplayKey(n, { ...key, color }, { color });
+  else changeDisplayKey(n, { image: '', color });
+}
+
+/** Takes the picture off key `n`, leaving its backlight colour. */
+export const removeDisplayKeyPicture = (n: number) => changeDisplayKey(n, { image: '', color: settings().displayKeys[n]?.color ?? BLACK }, { image: '' });
+
+/** Forgets key `n`: the app stops changing it, and it keeps the picture it shows now. */
+export const forgetDisplayKey = (n: number) => changeDisplayKey(n, null);

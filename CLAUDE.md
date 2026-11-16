@@ -15,7 +15,9 @@ its settings and draws a preview. See `README.md` for the layout, the command li
 - The page ships inside the exe as three static files and loads nothing from the network. Its only
   runtime dependencies are React and React DOM; ask before adding another.
 - Key presses are used for lighting only. Never log them, save them or expose them over the HTTP API.
-- Do not bring back display-key picture upload, GIFs or screen mirroring unless asked.
+- Display-key pictures are written to the keyboard only when they change and once the change has
+  settled, because every write goes to its flash. Do not bring back GIFs on the display keys or
+  screen mirroring unless asked.
 
 ## Build, run, test
 
@@ -113,3 +115,7 @@ Rules that keep the ports comparable:
   the sRGB curve just before sending (setting `gamma`). Effects, preview and `--dump-frame` work
   with uncorrected colours.
 - The keyboard forgets host control across sleep; `Engine.Reconnect` handles it.
+- Interface MI_02 (usage page 0xFF00) is the vendor channel ("QLink", `tray/QLink.cs`) that the
+  official configurator uses. The eight display keys (ids 109–116, 1–4 the back row) store a
+  120 × 120 baseline JPEG each (4:4:4 works), turned 90° clockwise. Writing takes about 10 ms per
+  49 bytes; the self-test only reads them.

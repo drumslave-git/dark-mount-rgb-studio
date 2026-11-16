@@ -38,6 +38,7 @@ export function attachPreview(canvas: HTMLCanvasElement): () => void {
   // (They do change at the same moments: both run on the tray app's clock and beat count.)
   let paletteSeed = newSeed();
   let runs: Run[] = []; // the selected layered preset, ready to draw
+  let pictures = new Map<string, HTMLImageElement>(); // the display keys' pictures, by data: URL
   let marked = new Set<number>(); // ids of the selected layer's lights, outlined in the picture
 
   const settings = () => seen.settings;
@@ -56,6 +57,21 @@ export function attachPreview(canvas: HTMLCanvasElement): () => void {
     const s = settings(), p = s.params[s.effect];
     palette = (p.palette?.length ? p.palette : ['#ffffff']).map(hexToRgb);
     if (p.random && !effectOf(s.effect).noPalette) palette.seed = paletteSeed;
+  }
+
+  // Loads the display keys' pictures that are new, and drops the ones no key has any more.
+  function syncPictures() {
+    const next = new Map<string, HTMLImageElement>();
+    for (const key of Object.values(settings().displayKeys)) {
+      if (!key.image || next.has(key.image)) continue;
+      let img = pictures.get(key.image);
+      if (!img) {
+        img = new Image();
+        img.src = key.image;
+      }
+      next.set(key.image, img);
+    }
+    pictures = next;
   }
 
   function syncRuns() {
@@ -94,6 +110,7 @@ export function attachPreview(canvas: HTMLCanvasElement): () => void {
     if (a.effect !== b.effect || a.mode !== b.mode || a.layerPreset !== b.layerPreset) io.keys.events = [];
     if (a.effect !== b.effect || a.params !== b.params) refreshPalette();
     if (a.paint !== b.paint) syncPaint();
+    if (a.displayKeys !== b.displayKeys) syncPictures();
     if (moved || a.mode !== b.mode || a.layerPreset !== b.layerPreset || a.layerPresets !== b.layerPresets || seen.selectedLayer !== was.selectedLayer) {
       syncRuns();
     }
@@ -130,13 +147,23 @@ export function attachPreview(canvas: HTMLCanvasElement): () => void {
       pctx.strokeStyle = '#2a2d32';
       pctx.stroke();
     }
-    for (const d of frame.displayKeys) {
+    // Display keys: the picture chosen for them over its backlight colour; dark when none is (the
+    // keyboard then shows a picture the page does not know).
+    frame.displayKeys.forEach((d, i) => {
+      const key = settings().displayKeys[i + 1];
       rect(d.x - d.size / 2, d.y - d.size / 2, d.x + d.size / 2, d.y + d.size / 2, 0.14);
-      pctx.fillStyle = '#050506';
+      pctx.fillStyle = key?.color ?? '#050506';
       pctx.fill();
+      const img = key?.image ? pictures.get(key.image) : undefined;
+      if (img?.complete && img.naturalWidth) {
+        pctx.save();
+        pctx.clip();
+        pctx.drawImage(img, px(d.x - d.size / 2), py(d.y - d.size / 2), d.size * scale, d.size * scale);
+        pctx.restore();
+      }
       pctx.strokeStyle = '#2a2d32';
       pctx.stroke();
-    }
+    });
 
     for (let i = 0; i < lamps.length; i++) {
       const l = lamps[i];
@@ -325,6 +352,7 @@ export function attachPreview(canvas: HTMLCanvasElement): () => void {
   // ------------------------------------------------------------------ start
 
   syncPaint();
+  syncPictures();
   refreshPalette();
   syncRuns();
   resize();

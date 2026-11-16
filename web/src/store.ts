@@ -17,6 +17,8 @@ export interface TrayStatus {
   audio?: string; // 'listening', 'silent' or 'unavailable'
   keys?: string; // 'watching', 'unavailable' or 'off'
   driving?: boolean;
+  displayKeys?: string[]; // per display key: '' (not set), 'waiting', 'sending', 'done' or 'failed' (unusable picture)
+  displayKeysProblem?: string; // why pictures that are waiting do not go out, '' when nothing is wrong
 }
 
 export interface State {
